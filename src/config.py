@@ -1,0 +1,55 @@
+"""Shared configuration loaded from .env and sensible defaults."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+# ── Paths ───────────────────────────────────────────────────────────────
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SRC_ROOT = Path(__file__).resolve().parent
+DATA_DIR = PROJECT_ROOT / "data"
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+DB_PATH = OUTPUTS_DIR / "reports.db"
+POLICY_PDF = PROJECT_ROOT / "Compliance_Policy_Manual.pdf"
+POLICY_RULES_JSON = OUTPUTS_DIR / "policy_rules.json"
+
+# ── Load .env ───────────────────────────────────────────────────────────
+load_dotenv(PROJECT_ROOT / ".env")
+
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+
+# ── Detection thresholds ────────────────────────────────────────────────
+PERSON_CONFIDENCE_THRESHOLD: float = 0.25
+YOLO_MODEL: str = "yolov8n.pt"
+FRAME_STRIDE: int = 30
+MAX_FRAMES: int | None = None
+
+# Walkway polygon ratios (fraction of frame dimensions)
+WALKWAY_TOP_Y_RATIO: float = 0.55
+WALKWAY_LEFT_X_RATIO: float = 0.12
+WALKWAY_RIGHT_X_RATIO: float = 0.88
+WALKWAY_OUTER_LEFT_RATIO: float = 0.02
+WALKWAY_OUTER_RIGHT_RATIO: float = 0.98
+
+# Vest detector HSV ranges
+GREEN_VEST_HSV_LOW = (35, 50, 50)
+GREEN_VEST_HSV_HIGH = (85, 255, 255)
+RED_VEST_HSV_LOW_1 = (0, 50, 50)
+RED_VEST_HSV_HIGH_1 = (10, 255, 255)
+RED_VEST_HSV_LOW_2 = (170, 50, 50)
+RED_VEST_HSV_HIGH_2 = (180, 255, 255)
+
+# Forklift overload
+FORKLIFT_OVERLOAD_THRESHOLD: int = 3
+FORKLIFT_CONFIDENCE_THRESHOLD: float = 0.5
+
+# Groq vision model for panel/forklift detection
+GROQ_VISION_MODEL: str = "llama-3.2-90b-vision-preview"
+GROQ_TEXT_MODEL: str = "llama-3.1-8b-instant"
+
+# ── Facility zone label (default for single-camera setup) ───────────────
+DEFAULT_ZONE: str = "Production Floor"

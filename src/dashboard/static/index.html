@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factory Compliance Monitor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Inter',sans-serif;
+  font-size:13px;
+  font-weight:400;
+  color:#e2e8f0;
+  background:#0f172a;
+  display:flex;
+}
+
+.sidebar{
+  width:240px;
+  min-width:240px;
+  background:rgba(15, 23, 42, 0.6);
+  backdrop-filter:blur(12px);
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  border-right:1px solid rgba(255,255,255,0.1);
+  height:100vh;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+.sidebar-header{
+  padding:24px 20px 16px;
+  font-size:12px;
+  font-weight: 700;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.sidebar-nav{
+  flex:1;
+  padding:12px 0;
+}
+.sidebar-nav a{
+  display:block;
+  padding:10px 20px;
+  color:#94a3b8;
+  text-decoration:none;
+  font-size:14px;
+  font-weight:500;
+  cursor:pointer;
+  border-left:3px solid transparent;
+  transition: all 0.2s ease;
+}
+.sidebar-nav a:hover{
+  color:#f8fafc;
+  background: rgba(255,255,255,0.03);
+}
+.sidebar-nav a.active{
+  color:#38bdf8;
+  border-left-color:#38bdf8;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%);
+}
+.upload-section {
+  padding: 20px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+.upload-section h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+}
+.version{
+  padding:16px 20px;
+  border-top:1px solid rgba(255,255,255,0.05);
+  font-size:11px;
+  color:#64748b;
+}
+
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  height:100vh;
+  background: radial-gradient(circle at top right, #1e293b, #0f172a);
+}
+.view{
+  display:none;
+  flex:1;
+  overflow-y:auto;
+  padding:32px;
+}
+.view.active{
+  display:flex;
+  flex-direction:column;
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-strip{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-block{
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(8px);
+  padding:20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-block:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.stat-label{
+  font-size:11px;
+  font-weight: 600;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color:#94a3b8;
+  margin-bottom:8px;
+}
+.stat-value{
+  font-size:24px;
+  font-weight:700;
+  color:#f8fafc;
+  font-variant-numeric:tabular-nums;
+}
+
+.feed-container{
+  background:#000;
+  border-radius: 12px 12px 0 0;
+  width: 100%;
+  aspect-ratio:16/9;
+  max-height:720px;
+  flex-shrink: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-bottom: none;
+}
+.feed-placeholder{
+  color:#475569;
+  font-size:14px;
+  font-family:'SF Mono', monospace;
+  letter-spacing: 0.1em;
+}
+.status-bar{
+  padding:12px 20px;
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:0.1em;
+  font-weight:700;
+  border-radius: 0 0 12px 12px;
+  background: #1e293b;
+  color:#94a3b8;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-top: none;
+  transition: all 0.3s ease;
+}
+.status-bar.violation{
+  color:#fff;
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+.status-bar.alert-critical{
+  animation:pulse-critical 1.5s ease-in-out infinite;
+}
+.status-bar.alert-high{
+  animation:pulse-high 1.5s ease-in-out infinite;
+}
+@keyframes pulse-critical{
+  0%,100%{background: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.4); box-shadow: 0 0 15px rgba(220, 38, 38, 0.2);}
+  50%{background: rgba(220, 38, 38, 0.2); border-color: rgba(220, 38, 38, 0.8); box-shadow: 0 0 25px rgba(220, 38, 38, 0.5);}
+}
+@keyframes pulse-high{
+  0%,100%{background: rgba(217, 119, 6, 0.1); border-color: rgba(217, 119, 6, 0.4); box-shadow: 0 0 15px rgba(217, 119, 6, 0.2);}
+  50%{background: rgba(217, 119, 6, 0.2); border-color: rgba(217, 119, 6, 0.8); box-shadow: 0 0 25px rgba(217, 119, 6, 0.5);}
+}
+
+.data-table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing: 0;
+  font-size:13px;
+}
+.data-table th{
+  position:sticky;
+  top:0;
+  background:#1e293b;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color:#94a3b8;
+  font-weight:600;
+  text-align:left;
+  padding:12px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  z-index:1;
+}
+.data-table td{
+  padding:12px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  vertical-align:middle;
+  color: #cbd5e1;
+}
+.data-table tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+.data-table .mono{
+  font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;
+  font-size:12px;
+  color:#94a3b8;
+}
+
+.badge{
+  display:inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding:4px 10px;
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  border-radius:9999px;
+  white-space:nowrap;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.badge-critical{background:rgba(220,38,38,0.1);color:#ef4444}
+.badge-high{background:rgba(217,119,6,0.1);color:#f59e0b}
+.badge-medium{background:rgba(161,141,48,0.1);color:#eab308}
+.badge-low{background:rgba(148,163,184,0.1);color:#94a3b8}
+
+.stream-row-critical td:first-child {border-left:3px solid #ef4444}
+.stream-row-high td:first-child {border-left:3px solid #f59e0b}
+
+.filter-bar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:24px;
+  flex-wrap:wrap;
+  background: rgba(30, 41, 59, 0.5);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.filter-bar select,
+.filter-bar input[type="date"],
+.filter-bar input[type="text"] {
+  font-family:inherit;
+  font-size:13px;
+  padding:8px 12px;
+  border-radius: 6px;
+  border:1px solid rgba(255,255,255,0.1);
+  background:rgba(15, 23, 42, 0.8);
+  color:#f8fafc;
+  outline: none;
+  transition: border-color 0.2s;
+  color-scheme: dark;
+}
+.filter-bar select:focus,
+.filter-bar input:focus {
+  border-color: #38bdf8;
+}
+.filter-bar label{
+  font-size:11px;
+  font-weight: 600;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  color:#94a3b8;
+}
+
+.export-group{
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+}
+.btn-export{
+  font-family:inherit;
+  font-size:13px;
+  font-weight: 500;
+  padding:8px 16px;
+  border-radius: 6px;
+  border:1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color:#f8fafc;
+  cursor:pointer;
+  transition: all 0.2s ease;
+}
+.btn-export:hover{
+  background: rgba(255,255,255,0.1);
+  transform: translateY(-1px);
+}
+.btn-export.btn-primary {
+  background: #38bdf8;
+  color: #0f172a;
+  border-color: #38bdf8;
+}
+.btn-export.btn-primary:hover {
+  background: #7dd3fc;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+.btn-export.btn-danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: #ef4444;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+.btn-export.btn-danger:hover {
+  background: rgba(220, 38, 38, 0.2);
+  border-color: #ef4444;
+}
+
+.table-wrap{
+  flex:1;
+  overflow-y:auto;
+  border-radius: 12px;
+  border:1px solid rgba(255,255,255,0.05);
+  background:rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(8px);
+}
+.detections-table-wrap{
+  margin-top:24px;
+  min-height: 350px;
+  max-height: 600px;
+  overflow-y:auto;
+  border-radius: 12px;
+  border:1px solid rgba(255,255,255,0.05);
+  background:rgba(30, 41, 59, 0.5);
+}
+.stream-table-wrap{
+  flex:1;
+  overflow-y:auto;
+  border-radius: 12px;
+  border:1px solid rgba(255,255,255,0.05);
+  background:rgba(30, 41, 59, 0.5);
+}
+
+.section-sub{
+  font-size:16px;
+  font-weight:600;
+  color:#f8fafc;
+  margin:32px 0 16px;
+  letter-spacing: -0.01em;
+}
+
+input[type="file"] {
+  font-family: inherit;
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 8px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  border: 1px dashed rgba(255,255,255,0.2);
+  width: 100%;
+}
+input[type="file"]::file-selector-button {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  margin-right: 12px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+input[type="file"]::file-selector-button:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+/* ── Toast notifications ─────────────────────────────── */
+.toast {
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-left: 4px solid #38bdf8;
+  border-radius: 8px;
+  padding: 14px 20px;
+  color: #f8fafc;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 320px;
+  max-width: 450px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+  animation: toastIn 0.3s ease forwards;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toast.toast-success {
+  border-left-color: #22c55e;
+}
+.toast.toast-warning {
+  border-left-color: #f59e0b;
+}
+.toast.toast-error {
+  border-left-color: #ef4444;
+}
+.toast .toast-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.toast .toast-text {
+  flex: 1;
+}
+.toast.toast-exit {
+  animation: toastOut 0.4s ease forwards;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(40px); }
+}
+</style>
+</head>
+<body>
+
+<div id="toast-container" style="position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;"></div>
+
+<!-- ── Sidebar ──────────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="sidebar-header">Compliance Monitor</div>
+  <div class="sidebar-nav">
+    <a data-view="live" class="active">Live Feed</a>
+    <a data-view="stream">Event Stream</a>
+    <a data-view="log">Historical Log</a>
+    <a data-view="policy">Policy Manager</a>
+  </div>
+  <div class="upload-section" style="margin-top: auto;">
+    <h3>Upload Video</h3>
+    <input type="file" id="video-upload-input" accept="video/mp4" style="margin-bottom: 12px;">
+    <button id="btn-upload" class="btn-export btn-primary" style="width: 100%;">Upload & Process</button>
+    <div id="upload-status" style="margin-top: 10px; font-size: 11px; color: #aaa; text-transform: uppercase;"></div>
+  </div>
+  <div class="version">v1.0 · Groq + YOLOv8</div>
+</nav>
+
+<!-- ── Main ─────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- View 1: Live Feed -->
+  <div id="view-live" class="view active">
+    <div class="stat-strip">
+      <div class="stat-block">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" id="live-status">Idle</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Last Clip</div>
+        <div class="stat-value" id="live-clip">—</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Events This Session</div>
+        <div class="stat-value" id="live-count">0</div>
+      </div>
+      <div class="stat-block">
+        <div class="stat-label">Max Severity</div>
+        <div class="stat-value" id="live-severity">—</div>
+      </div>
+    </div>
+
+    <div class="feed-container" id="video-container">
+      <span class="feed-placeholder" id="feed-placeholder">CAMERA FEED — NO SIGNAL</span>
+      <video id="live-video" src="" autoplay loop muted playsinline style="display:none; width:100%; height:100%; object-fit:cover;"></video>
+    </div>
+
+    <div class="status-bar" id="live-status-bar">
+      NO VIOLATION
+    </div>
+
+    <div class="section-sub">Current Clip Detections</div>
+    <div class="detections-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Behavior Class</th>
+            <th>Severity</th>
+            <th>Zone</th>
+          </tr>
+        </thead>
+        <tbody id="live-detections"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- View 2: Event Stream -->
+  <div id="view-stream" class="view">
+    <div class="filter-bar">
+      <label>Severity</label>
+      <select id="stream-severity-filter">
+        <option value="">All</option>
+        <option value="CRITICAL">Critical</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="LOW">Low</option>
+      </select>
+      <label>Class</label>
+      <select id="stream-class-filter">
+        <option value="">All</option>
+      </select>
+    </div>
+    <div class="stream-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Severity</th>
+            <th>Behavior Class</th>
+            <th>Clip</th>
+            <th>Zone</th>
+          </tr>
+        </thead>
+        <tbody id="stream-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- View 3: Historical Log + Export -->
+  <div id="view-log" class="view">
+    <div class="filter-bar">
+      <label>From</label>
+      <input type="date" id="log-start">
+      <label>To</label>
+      <input type="date" id="log-end">
+      <label>Severity</label>
+      <select id="log-severity-filter">
+        <option value="">All</option>
+        <option value="CRITICAL">Critical</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+        <option value="LOW">Low</option>
+      </select>
+      <label>Class</label>
+      <select id="log-class-filter">
+        <option value="">All</option>
+      </select>
+      <div class="export-group">
+        <button class="btn-export" id="btn-export-csv">Export CSV</button>
+        <button class="btn-export" id="btn-export-json">Export JSON</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Event ID</th>
+            <th>Timestamp</th>
+            <th>Clip</th>
+            <th>Zone</th>
+            <th>Behavior Class</th>
+            <th>Policy Ref</th>
+            <th>Severity</th>
+            <th>Escalation</th>
+          </tr>
+        </thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- View 4: Policy Manager -->
+  <div id="view-policy" class="view">
+    <div class="filter-bar" style="justify-content: space-between;">
+      <div style="font-size: 16px; font-weight: 600; color: #f8fafc;">Active Policy Rules</div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="file" id="policy-upload-input" accept="application/pdf" style="width: auto;">
+        <button id="btn-upload-policy" class="btn-export btn-primary">Parse New Policy</button>
+        <div id="policy-upload-status" style="font-size: 11px; color: #94a3b8; text-transform: uppercase;"></div>
+        <button id="btn-clear-policy" class="btn-export btn-danger">Clear All</button>
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-top: 16px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Behavior Class</th>
+            <th>Severity</th>
+            <th>Rule Text</th>
+            <th>Observable Indicators</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="policy-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── Mock data for standalone testing ──────────────────── */
+const MOCK_EVENTS = [
+  {event_id:"4dd04758-a1b2-4c3d-8e9f-1a2b3c4d5e6f",timestamp:"2026-06-19T10:30:00+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Safe Walkway Violation",policy_rule_ref:"Section 3.3.2",severity:"MEDIUM",escalation_action:"Logged to database"},
+  {event_id:"d4880641-b2c3-4d5e-9f0a-2b3c4d5e6f7a",timestamp:"2026-06-19T10:30:01+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Unauthorized Intervention",policy_rule_ref:"Section 4.3.2",severity:"HIGH",escalation_action:"Queued for real-time alert"},
+  {event_id:"53e2c5b8-c3d4-4e5f-a0b1-3c4d5e6f7a8b",timestamp:"2026-06-19T10:30:02+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Safe Walkway Violation",policy_rule_ref:"Section 3.3.2",severity:"MEDIUM",escalation_action:"Logged to database"},
+  {event_id:"ef36cfea-d4e5-4f6a-b1c2-4d5e6f7a8b9c",timestamp:"2026-06-19T10:30:03+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Opened Panel Cover",policy_rule_ref:"Section 5.2.2",severity:"LOW",escalation_action:"Logged to database"},
+  {event_id:"e946add3-e5f6-4a7b-c2d3-5e6f7a8b9c0d",timestamp:"2026-06-19T10:30:04+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Carrying Overload with Forklift",policy_rule_ref:"Section 6.3.2",severity:"CRITICAL",escalation_action:"Queued for real-time alert"},
+  {event_id:"1ad9ebd7-f6a7-4b8c-d3e4-6f7a8b9c0d1e",timestamp:"2026-06-19T10:30:05+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Unauthorized Intervention",policy_rule_ref:"Section 4.3.2",severity:"HIGH",escalation_action:"Queued for real-time alert"},
+  {event_id:"446642ff-a7b8-4c9d-e4f5-7a8b9c0d1e2f",timestamp:"2026-06-19T10:30:06+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Safe Walkway Violation",policy_rule_ref:"Section 3.3.2",severity:"MEDIUM",escalation_action:"Logged to database"},
+  {event_id:"9be607a3-b8c9-4d0e-f5a6-8b9c0d1e2f3a",timestamp:"2026-06-19T10:30:07+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Unauthorized Intervention",policy_rule_ref:"Section 4.3.2",severity:"HIGH",escalation_action:"Queued for real-time alert"},
+  {event_id:"113fff4c-c9d0-4e1f-a6b7-9c0d1e2f3a4b",timestamp:"2026-06-19T10:30:08+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Opened Panel Cover",policy_rule_ref:"Section 5.2.2",severity:"LOW",escalation_action:"Logged to database"},
+  {event_id:"6ae7616b-d0e1-4f2a-b7c8-0d1e2f3a4b5c",timestamp:"2026-06-19T10:30:09+00:00",clip_id:"0_te1.mp4",zone:"Production Floor",behavior_class:"Carrying Overload with Forklift",policy_rule_ref:"Section 6.3.2",severity:"CRITICAL",escalation_action:"Queued for real-time alert"},
+];
+
+let streamCache = [];
+window.uploadCounter = 0;
+
+/* ── Helpers ───────────────────────────────────────────── */
+function badgeClass(sev) {
+  return 'badge badge-' + sev.toLowerCase();
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts.substring(0, 19);
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+    + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+function truncId(id) {
+  return id ? id.substring(0, 8) : '—';
+}
+
+async function apiFetch(url, options = {}) {
+  try {
+    const r = await fetch(url, options);
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+/* ── Navigation ────────────────────────────────────────── */
+const navLinks = document.querySelectorAll('.sidebar-nav a');
+const views = document.querySelectorAll('.view');
+
+navLinks.forEach(link => {
+  link.addEventListener('click', () => {
+    const target = link.dataset.view;
+    navLinks.forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    views.forEach(v => {
+      v.classList.toggle('active', v.id === 'view-' + target);
+    });
+    if (target === 'log') fetchLog();
+    if (target === 'policy') renderPolicies();
+  });
+});
+
+/* ── View 1: Live Feed ─────────────────────────────────── */
+async function pollLive() {
+  const data = await apiFetch('/api/events/live');
+  const events = data ? data.detections : MOCK_EVENTS.slice(0, 5);
+  const status = data ? data.status : 'idle';
+  const clipId = data && data.clip_id ? data.clip_id : null;
+  const count = data ? data.events_this_session : MOCK_EVENTS.length;
+  const maxSev = data ? data.max_severity : 'HIGH';
+  const hasViolation = data ? data.has_violation : true;
+
+  document.getElementById('live-status').textContent =
+    status === 'alert' ? 'Alert Active' : status === 'violation' ? 'Violation Detected' : 'Pipeline Running';
+  document.getElementById('live-clip').textContent = clipId || '—';
+  document.getElementById('live-count').textContent = count;
+
+  // Real-time animation toast logic
+  if (window.lastAlertCount === undefined) window.lastAlertCount = count;
+  if (count > window.lastAlertCount && events && events.length > 0) {
+    const newCount = count - window.lastAlertCount;
+    const newEvents = events.slice(0, newCount);
+    newEvents.forEach(ev => {
+      if (ev.severity === 'HIGH' || ev.severity === 'CRITICAL') {
+        showToast('New ' + ev.severity + ' Alert', ev.behavior_class + ' detected in ' + ev.zone, ev.severity);
+      }
+    });
+    window.lastAlertCount = count;
+  } else if (count < window.lastAlertCount) {
+    // Session reset
+    window.lastAlertCount = count;
+  }
+
+  const sevEl = document.getElementById('live-severity');
+  sevEl.textContent = maxSev || '—';
+
+  // Handle Video Element
+  const videoEl = document.getElementById('live-video');
+  const placeholderEl = document.getElementById('feed-placeholder');
+  
+  const currentClipStr = videoEl.getAttribute('data-clip-id');
+  const currentUploadVer = videoEl.getAttribute('data-upload-ver');
+
+  if (clipId) {
+    if (currentClipStr !== clipId || currentUploadVer != window.uploadCounter) {
+      videoEl.setAttribute('data-clip-id', clipId);
+      videoEl.setAttribute('data-upload-ver', window.uploadCounter);
+      videoEl.src = '/data/' + clipId + '?t=' + new Date().getTime();
+      videoEl.style.display = 'block';
+      placeholderEl.style.display = 'none';
+      videoEl.load();
+      videoEl.play().catch(e => console.log('Autoplay prevented:', e));
+    }
+  } else {
+    videoEl.style.display = 'none';
+    placeholderEl.style.display = 'block';
+  }
+
+  const bar = document.getElementById('live-status-bar');
+  bar.className = 'status-bar';
+  if (hasViolation && maxSev) {
+    bar.textContent = 'VIOLATION DETECTED — ' + maxSev;
+    bar.classList.add('violation');
+    if (maxSev === 'CRITICAL') bar.classList.add('alert-critical');
+    else if (maxSev === 'HIGH') bar.classList.add('alert-high');
+  } else {
+    bar.textContent = 'NO VIOLATION';
+  }
+
+  const tbody = document.getElementById('live-detections');
+  tbody.innerHTML = '';
+  (events || []).forEach(ev => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="mono">' + formatTimestamp(ev.timestamp) + '</td>' +
+      '<td>' + ev.behavior_class + '</td>' +
+      '<td><span class="' + badgeClass(ev.severity) + '">' + ev.severity + '</span></td>' +
+      '<td>' + ev.zone + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+/* ── View 2: Event Stream ──────────────────────────────── */
+
+async function pollStream() {
+  const data = await apiFetch('/api/events/stream');
+  streamCache = data ? data.events : MOCK_EVENTS;
+  renderStream();
+}
+
+function renderStream() {
+  const sevFilter = document.getElementById('stream-severity-filter').value;
+  const clsFilter = document.getElementById('stream-class-filter').value;
+
+  let events = streamCache;
+  if (sevFilter) events = events.filter(e => e.severity === sevFilter);
+  if (clsFilter) events = events.filter(e => e.behavior_class === clsFilter);
+
+  const tbody = document.getElementById('stream-body');
+  tbody.innerHTML = '';
+  events.forEach(ev => {
+    const tr = document.createElement('tr');
+    const sev = ev.severity;
+    if (sev === 'CRITICAL') tr.className = 'stream-row-critical';
+    else if (sev === 'HIGH') tr.className = 'stream-row-high';
+
+    tr.innerHTML =
+      '<td class="mono">' + formatTimestamp(ev.timestamp) + '</td>' +
+      '<td><span class="' + badgeClass(sev) + '">' + sev + '</span></td>' +
+      '<td>' + ev.behavior_class + '</td>' +
+      '<td class="mono">' + ev.clip_id + '</td>' +
+      '<td>' + ev.zone + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('stream-severity-filter').addEventListener('change', renderStream);
+document.getElementById('stream-class-filter').addEventListener('change', renderStream);
+
+/* ── View 3: Historical Log ────────────────────────────── */
+async function fetchLog() {
+  const start = document.getElementById('log-start').value;
+  const end = document.getElementById('log-end').value;
+  const sev = document.getElementById('log-severity-filter').value;
+  const cls = document.getElementById('log-class-filter').value;
+
+  let url = '/api/events/log?';
+  if (start) url += 'start=' + start + '&';
+  if (end) url += 'end=' + end + '&';
+  if (sev) url += 'severity=' + sev + '&';
+  if (cls) url += 'class=' + encodeURIComponent(cls) + '&';
+
+  const data = await apiFetch(url);
+  const events = data ? data.events : MOCK_EVENTS;
+
+  const tbody = document.getElementById('log-body');
+  tbody.innerHTML = '';
+  events.forEach(ev => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="mono">' + truncId(ev.event_id) + '</td>' +
+      '<td class="mono">' + formatTimestamp(ev.timestamp) + '</td>' +
+      '<td class="mono">' + ev.clip_id + '</td>' +
+      '<td>' + ev.zone + '</td>' +
+      '<td>' + ev.behavior_class + '</td>' +
+      '<td class="mono">' + ev.policy_rule_ref + '</td>' +
+      '<td><span class="' + badgeClass(ev.severity) + '">' + ev.severity + '</span></td>' +
+      '<td>' + ev.escalation_action + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('log-start').addEventListener('change', fetchLog);
+document.getElementById('log-end').addEventListener('change', fetchLog);
+document.getElementById('log-severity-filter').addEventListener('change', fetchLog);
+document.getElementById('log-class-filter').addEventListener('change', fetchLog);
+
+/* ── Export ─────────────────────────────────────────────── */
+document.getElementById('btn-export-csv').addEventListener('click', () => {
+  const sev = document.getElementById('log-severity-filter').value;
+  const cls = document.getElementById('log-class-filter').value;
+  let url = '/api/export/csv?';
+  if (sev) url += 'severity=' + sev + '&';
+  if (cls) url += 'behavior_class=' + encodeURIComponent(cls);
+  window.open(url, '_blank');
+});
+
+document.getElementById('btn-export-json').addEventListener('click', () => {
+  const sev = document.getElementById('log-severity-filter').value;
+  const cls = document.getElementById('log-class-filter').value;
+  let url = '/api/export/json?';
+  if (sev) url += 'severity=' + sev + '&';
+  if (cls) url += 'behavior_class=' + encodeURIComponent(cls);
+  window.open(url, '_blank');
+});
+
+/* ── Dynamic Policy Load ───────────────────────────────── */
+async function loadPolicyRules() {
+  const data = await apiFetch('/api/policy/rules');
+  const classSelects = [
+    document.getElementById('stream-class-filter'),
+    document.getElementById('log-class-filter')
+  ];
+  
+  const classes = data && data.rules ? data.rules.map(r => r.behavior_class) : [];
+  
+  classSelects.forEach(select => {
+    select.innerHTML = '<option value="">All</option>';
+    classes.forEach(cls => {
+      const opt = document.createElement('option');
+      opt.value = cls;
+      opt.textContent = cls;
+      select.appendChild(opt);
+    });
+  });
+}
+
+async function renderPolicies() {
+  const data = await apiFetch('/api/policy/rules');
+  const tbody = document.getElementById('policy-body');
+  tbody.innerHTML = '';
+  
+  if (!data || !data.rules || data.rules.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888;">No active policies. Upload a PDF to parse rules.</td></tr>';
+    return;
+  }
+  
+  data.rules.forEach((rule, index) => {
+    const tr = document.createElement('tr');
+    const obs = rule.observable_indicators || [];
+    tr.innerHTML = `
+      <td style="font-weight: 500;">${rule.behavior_class}</td>
+      <td><span class="${badgeClass(rule.severity)}">${rule.severity}</span></td>
+      <td style="max-width: 300px; white-space: normal;">${rule.rule_text}</td>
+      <td class="mono" style="max-width: 200px; white-space: normal;">${obs.join(', ')}</td>
+      <td><button class="btn-export btn-danger" onclick="deletePolicyRule(${index})">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function deletePolicyRule(index) {
+  if (!confirm("Are you sure you want to remove this rule?")) return;
+  const res = await fetch(`/api/policy/rules/${index}`, { method: 'DELETE' });
+  if (res.ok) {
+    await loadPolicyRules();
+    await renderPolicies();
+    showToast("Rule Removed", "The policy rule has been deleted.", "LOW");
+  } else {
+    alert("Failed to delete rule.");
+  }
+}
+
+document.getElementById('btn-clear-policy').addEventListener('click', async () => {
+  if (!confirm("Are you sure you want to clear all active policies?")) return;
+  const res = await fetch('/api/policy/rules', { method: 'DELETE' });
+  if (res.ok) {
+    await loadPolicyRules();
+    await renderPolicies();
+    showToast("Policies Cleared", "All active policy rules have been removed.", "LOW");
+  } else {
+    alert("Failed to clear policies.");
+  }
+});
+
+/* ── Polling ───────────────────────────────────────────── */
+loadPolicyRules().then(() => {
+  pollLive();
+  pollStream();
+  fetchLog();
+
+  setInterval(pollLive, 3000);
+  setInterval(pollStream, 5000);
+});
+
+/* ── Video Upload ──────────────────────────────────────── */
+document.getElementById('btn-upload').addEventListener('click', async () => {
+  const fileInput = document.getElementById('video-upload-input');
+  const statusEl = document.getElementById('upload-status');
+  if (!fileInput.files || fileInput.files.length === 0) {
+    statusEl.textContent = "Please select a file.";
+    return;
+  }
+  
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    statusEl.textContent = "Uploading...";
+    statusEl.style.color = '#ccc';
+    document.getElementById('btn-upload').disabled = true;
+    
+    const response = await fetch('/api/video/upload', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    
+    if (data.error) {
+      statusEl.textContent = data.error;
+      statusEl.style.color = '#ff4d4f';
+      document.getElementById('btn-upload').disabled = false;
+      return;
+    }
+    
+    statusEl.textContent = "Processing...";
+    statusEl.style.color = '#faad14';
+    
+    // Start polling status
+    pollUploadStatus();
+  } catch (err) {
+    statusEl.textContent = "Upload failed.";
+    statusEl.style.color = '#ff4d4f';
+    document.getElementById('btn-upload').disabled = false;
+  }
+});
+
+let _lastDetail = '';
+
+function showToast(message, type = 'info', duration = 4000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (type !== 'info' ? ' toast-' + type : '');
+  const icons = { info: '⚙️', success: '✅', warning: '⚠️', error: '❌' };
+  toast.innerHTML = '<span class="toast-icon">' + (icons[type] || '⚙️') + '</span><span class="toast-text">' + message + '</span>';
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('toast-exit');
+    setTimeout(() => toast.remove(), 400);
+  }, duration);
+}
+
+async function pollUploadStatus() {
+  const statusEl = document.getElementById('upload-status');
+  try {
+    const data = await apiFetch('/api/video/status');
+    if (data.is_processing) {
+      let pct = data.progress ? Math.round(data.progress * 100) : 0;
+      let text = "Processing... (" + data.current_clip + ") ";
+      if (data.status === 'annotating') text += `[Annotating ${pct}%]`;
+      else if (data.status === 'detecting') text += `[Detecting...]`;
+      
+      statusEl.textContent = text;
+      statusEl.style.color = '#faad14';
+
+      // Show toast for each new detail step
+      if (data.detail && data.detail !== _lastDetail) {
+        _lastDetail = data.detail;
+        showToast(data.detail, 'warning', 5000);
+      }
+
+      setTimeout(pollUploadStatus, 2000);
+    } else {
+      if (data.status === 'completed') {
+        statusEl.textContent = "Processing Complete.";
+        statusEl.style.color = '#52c41a';
+        window.uploadCounter++;
+        showToast('Processing complete! Video ready.', 'success', 6000);
+        _lastDetail = '';
+        // Reset backend processing status so a new video can be uploaded
+        apiFetch('/api/video/reset', { method: 'POST' });
+        document.getElementById('btn-upload').disabled = false;
+        document.getElementById('video-upload-input').value = "";
+      } else if (data.status === 'idle') {
+        // Nothing processing
+        document.getElementById('btn-upload').disabled = false;
+      } else {
+        statusEl.textContent = "Error: " + data.status;
+        statusEl.style.color = '#ff4d4f';
+        showToast('Error: ' + data.status, 'error', 8000);
+        _lastDetail = '';
+        apiFetch('/api/video/reset', { method: 'POST' });
+        document.getElementById('btn-upload').disabled = false;
+        document.getElementById('video-upload-input').value = "";
+      }
+    }
+  } catch (err) {
+    setTimeout(pollUploadStatus, 2000);
+  }
+}
+
+function showToast(title, message, severity) {
+  const toast = document.createElement('div');
+  const bg = severity === 'CRITICAL' ? '#dc2626' : '#d97706';
+  toast.style.cssText = `background:${bg}; color:white; padding:16px; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); width:300px; transform:translateX(120%); transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);`;
+  toast.innerHTML = `<div style="font-weight:bold; font-size:13px; margin-bottom:4px; text-transform:uppercase;">${title}</div><div style="font-size:12px; opacity:0.9;">${message}</div>`;
+  document.getElementById('toast-container').appendChild(toast);
+  
+  // slide in
+  setTimeout(() => { toast.style.transform = 'translateX(0)'; }, 50);
+  
+  // slide out
+  setTimeout(() => { 
+    toast.style.transform = 'translateX(120%)'; 
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+/* ── Policy Upload ─────────────────────────────────────── */
+document.getElementById('btn-upload-policy').addEventListener('click', async () => {
+  const fileInput = document.getElementById('policy-upload-input');
+  const statusEl = document.getElementById('policy-upload-status');
+  if (!fileInput.files || fileInput.files.length === 0) {
+    statusEl.textContent = "Please select a PDF file.";
+    return;
+  }
+  
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    statusEl.textContent = "Parsing (this takes a moment)...";
+    statusEl.style.color = '#ccc';
+    document.getElementById('btn-upload-policy').disabled = true;
+    
+    const response = await fetch('/api/policy/parse', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    
+    if (data.status === "error") {
+      statusEl.textContent = data.detail || "Parse failed.";
+      statusEl.style.color = '#ff4d4f';
+    } else {
+      statusEl.textContent = `Success! Found ${data.count} rules.`;
+      statusEl.style.color = '#52c41a';
+      // Reload the filters and active tab to show the new behavior classes
+      await loadPolicyRules();
+      if (document.getElementById('view-policy').classList.contains('active')) {
+        await renderPolicies();
+      }
+    }
+  } catch (err) {
+    statusEl.textContent = "Upload failed.";
+    statusEl.style.color = '#ff4d4f';
+  } finally {
+    document.getElementById('btn-upload-policy').disabled = false;
+  }
+});
+</script></body>
+</html>
