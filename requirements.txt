@@ -1,0 +1,10 @@
+opencv-python
+ultralytics
+groq
+pdfplumber
+pydantic
+pandas
+fastapi
+uvicorn
+python-multipart
+python-dotenv

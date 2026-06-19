@@ -1,0 +1,31 @@
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment Variables
+.env
+.env.local
+
+# Data and Outputs
+data/
+outputs/
+scratch/
+*.db
+*.sqlite3
+
+# Downloaded Models and DLLs
+*.pt
+*.dll
+
+# IDEs and OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
