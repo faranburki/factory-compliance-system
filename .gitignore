@@ -29,3 +29,9 @@ scratch/
 .idea/
 .DS_Store
 *.swp
+
+# Assessment Instructions and Scratch Files
+Intern_Assessment_AI.pdf
+Master_Build_Guideee.pdf
+progress.md
+test.py
