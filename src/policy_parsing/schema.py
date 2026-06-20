@@ -1,4 +1,7 @@
-"""Pydantic models for policy-rule extraction."""
+"""
+Module 1 — Policy Parsing | schema.py
+Defines the Pydantic models used to structure policy-rule extraction.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +15,9 @@ BehaviorClass = str
 SeverityTier = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 class PolicyRule(BaseModel):
-	"""A single extracted policy rule."""
+	"""
+	A single extracted policy rule defining a behavior class and its severity.
+	"""
 
 	behavior_class: BehaviorClass = Field(
 		...,
@@ -40,7 +45,9 @@ class PolicyRule(BaseModel):
 	)
 
 class PolicyRuleExtraction(BaseModel):
-	"""Structured Groq output for the policy-rule extraction step."""
+	"""
+	Structured Groq output schema for the entire policy-rule extraction step.
+	"""
 
 	rules: list[PolicyRule] = Field(
 		...,

@@ -1,4 +1,7 @@
-"""Video loading helpers for the detection pipeline."""
+"""
+Module 1 — Detection Engine | video_utils.py
+Helper functions for loading video metadata and iterating over sampled frames.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +22,18 @@ class VideoMetadata:
 
 
 def load_video_metadata(video_path: str | Path) -> VideoMetadata:
+	"""
+	Extract essential metadata like framerate and resolution from a video file.
+
+	Args:
+		video_path: Path to the video file.
+
+	Returns:
+		A VideoMetadata object populated with video properties.
+
+	Raises:
+		FileNotFoundError: If the video cannot be opened by OpenCV.
+	"""
 	path = Path(video_path)
 	cap = cv2.VideoCapture(str(path))
 	try:
@@ -32,12 +47,26 @@ def load_video_metadata(video_path: str | Path) -> VideoMetadata:
 			height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0),
 		)
 	finally:
+		# Ensure video capture resource is released safely even on exception
 		cap.release()
 
 
 def iter_video_frames(video_path: str | Path, *, stride: int = 1, max_frames: int | None = None) -> Iterator[tuple[int, np.ndarray]]:
-	"""Yield sampled frames from a video."""
+	"""
+	Yield sampled frames from a video file based on a specific stride.
 
+	Args:
+		video_path: Path to the video file.
+		stride: Number of frames to advance between samples. Must be >= 1.
+		max_frames: Optional upper limit on the total number of frames yielded.
+
+	Yields:
+		Tuples containing the 0-indexed frame number and the frame as a numpy array.
+
+	Raises:
+		ValueError: If stride is less than 1.
+		FileNotFoundError: If the video cannot be opened.
+	"""
 	if stride < 1:
 		raise ValueError("stride must be at least 1")
 
@@ -53,9 +82,12 @@ def iter_video_frames(video_path: str | Path, *, stride: int = 1, max_frames: in
 			if not ok:
 				break
 
+			# Only yield frames that align with the specified sampling stride
 			if frame_index % stride == 0:
 				yield frame_index, frame
 				sampled += 1
+				
+				# Terminate early if the maximum frame count limit is hit
 				if max_frames is not None and sampled >= max_frames:
 					break
 
@@ -65,8 +97,18 @@ def iter_video_frames(video_path: str | Path, *, stride: int = 1, max_frames: in
 
 
 def load_first_frame(video_path: str | Path) -> tuple[int, np.ndarray]:
-	"""Return the first frame from a video."""
+	"""
+	Extract the very first frame of a video.
 
+	Args:
+		video_path: Path to the video file.
+
+	Returns:
+		A tuple containing the frame index (0) and the frame image.
+
+	Raises:
+		ValueError: If the video file is empty and yields no frames.
+	"""
 	for frame_index, frame in iter_video_frames(video_path, stride=1, max_frames=1):
 		return frame_index, frame
 	raise ValueError(f"No frames found in video: {video_path}")
