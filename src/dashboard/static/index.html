@@ -396,12 +396,12 @@ input[type="file"]::file-selector-button:hover {
   border: 1px solid rgba(255,255,255,0.1);
   border-left: 4px solid #38bdf8;
   border-radius: 8px;
-  padding: 14px 20px;
+  padding: 8px 12px;
   color: #f8fafc;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  min-width: 320px;
-  max-width: 450px;
+  min-width: 200px;
+  max-width: 280px;
   box-shadow: 0 10px 25px rgba(0,0,0,0.4);
   animation: toastIn 0.3s ease forwards;
   display: flex;
@@ -629,6 +629,9 @@ const MOCK_EVENTS = [
 
 let streamCache = [];
 window.uploadCounter = 0;
+let scheduledEvents = [];
+let displayedEvents = new Set();
+let lastVideoTime = 0;
 
 /* ── Helpers ───────────────────────────────────────────── */
 function badgeClass(sev) {
@@ -678,36 +681,10 @@ navLinks.forEach(link => {
 /* ── View 1: Live Feed ─────────────────────────────────── */
 async function pollLive() {
   const data = await apiFetch('/api/events/live');
-  const events = data ? data.detections : MOCK_EVENTS.slice(0, 5);
-  const status = data ? data.status : 'idle';
+  const events = data ? data.detections : (MOCK_EVENTS.slice(0, 5).map((e,i) => ({...e, time_sec: i*2})));
   const clipId = data && data.clip_id ? data.clip_id : null;
-  const count = data ? data.events_this_session : MOCK_EVENTS.length;
-  const maxSev = data ? data.max_severity : 'HIGH';
-  const hasViolation = data ? data.has_violation : true;
 
-  document.getElementById('live-status').textContent =
-    status === 'alert' ? 'Alert Active' : status === 'violation' ? 'Violation Detected' : 'Pipeline Running';
-  document.getElementById('live-clip').textContent = clipId || '—';
-  document.getElementById('live-count').textContent = count;
-
-  // Real-time animation toast logic
-  if (window.lastAlertCount === undefined) window.lastAlertCount = count;
-  if (count > window.lastAlertCount && events && events.length > 0) {
-    const newCount = count - window.lastAlertCount;
-    const newEvents = events.slice(0, newCount);
-    newEvents.forEach(ev => {
-      if (ev.severity === 'HIGH' || ev.severity === 'CRITICAL') {
-        showToast('New ' + ev.severity + ' Alert', ev.behavior_class + ' detected in ' + ev.zone, ev.severity);
-      }
-    });
-    window.lastAlertCount = count;
-  } else if (count < window.lastAlertCount) {
-    // Session reset
-    window.lastAlertCount = count;
-  }
-
-  const sevEl = document.getElementById('live-severity');
-  sevEl.textContent = maxSev || '—';
+  scheduledEvents = events || [];
 
   // Handle Video Element
   const videoEl = document.getElementById('live-video');
@@ -723,37 +700,96 @@ async function pollLive() {
       videoEl.src = '/data/' + clipId + '?t=' + new Date().getTime();
       videoEl.style.display = 'block';
       placeholderEl.style.display = 'none';
+      
+      // Reset state for new clip
+      displayedEvents.clear();
+      lastVideoTime = 0;
+      document.getElementById('live-detections').innerHTML = '';
+      document.getElementById('live-count').textContent = '0';
+      document.getElementById('live-severity').textContent = '—';
+      document.getElementById('live-status').textContent = 'Pipeline Running';
+      
+      const bar = document.getElementById('live-status-bar');
+      bar.className = 'status-bar';
+      bar.textContent = 'NO VIOLATION';
+      
       videoEl.load();
       videoEl.play().catch(e => console.log('Autoplay prevented:', e));
     }
   } else {
     videoEl.style.display = 'none';
     placeholderEl.style.display = 'block';
+    document.getElementById('live-status').textContent = 'Idle';
   }
-
-  const bar = document.getElementById('live-status-bar');
-  bar.className = 'status-bar';
-  if (hasViolation && maxSev) {
-    bar.textContent = 'VIOLATION DETECTED — ' + maxSev;
-    bar.classList.add('violation');
-    if (maxSev === 'CRITICAL') bar.classList.add('alert-critical');
-    else if (maxSev === 'HIGH') bar.classList.add('alert-high');
-  } else {
-    bar.textContent = 'NO VIOLATION';
-  }
-
-  const tbody = document.getElementById('live-detections');
-  tbody.innerHTML = '';
-  (events || []).forEach(ev => {
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td class="mono">' + formatTimestamp(ev.timestamp) + '</td>' +
-      '<td>' + ev.behavior_class + '</td>' +
-      '<td><span class="' + badgeClass(ev.severity) + '">' + ev.severity + '</span></td>' +
-      '<td>' + ev.zone + '</td>';
-    tbody.appendChild(tr);
-  });
+  
+  document.getElementById('live-clip').textContent = clipId || '—';
 }
+
+document.getElementById('live-video').addEventListener('timeupdate', function() {
+  const videoEl = this;
+  if (!videoEl || videoEl.paused || videoEl.ended) return;
+  
+  const currentTime = videoEl.currentTime;
+  
+  // If video looped or seeked backwards, reset
+  if (currentTime < lastVideoTime - 1.0) {
+    displayedEvents.clear();
+    document.getElementById('live-detections').innerHTML = '';
+  }
+  lastVideoTime = currentTime;
+  
+  let newEventsFound = false;
+  let currentMaxSev = null;
+  const sevRank = { "LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4 };
+
+  scheduledEvents.forEach(ev => {
+    // If the event time has been reached
+    if (currentTime >= (ev.time_sec || 0)) {
+      if (!displayedEvents.has(ev.event_id)) {
+        displayedEvents.add(ev.event_id);
+        newEventsFound = true;
+        
+        // Update table
+        const tbody = document.getElementById('live-detections');
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="mono">' + formatTimestamp(ev.timestamp) + '</td>' +
+          '<td>' + ev.behavior_class + '</td>' +
+          '<td><span class="' + badgeClass(ev.severity) + '">' + ev.severity + '</span></td>' +
+          '<td>' + ev.zone + '</td>';
+        // prepend to show latest on top
+        tbody.insertBefore(tr, tbody.firstChild);
+
+        // Toast notification for high/critical
+        if (ev.severity === 'HIGH' || ev.severity === 'CRITICAL') {
+          showToast('New ' + ev.severity + ' Alert', ev.behavior_class + ' detected in ' + ev.zone, ev.severity);
+        }
+      }
+      
+      // Keep track of max severity among ALL displayed events
+      if (!currentMaxSev || sevRank[ev.severity] > sevRank[currentMaxSev]) {
+        currentMaxSev = ev.severity;
+      }
+    }
+  });
+
+  if (newEventsFound) {
+    document.getElementById('live-count').textContent = displayedEvents.size;
+    document.getElementById('live-severity').textContent = currentMaxSev || '—';
+    
+    document.getElementById('live-status').textContent = 
+      (currentMaxSev === 'HIGH' || currentMaxSev === 'CRITICAL') ? 'Alert Active' : 'Violation Detected';
+      
+    const bar = document.getElementById('live-status-bar');
+    bar.className = 'status-bar';
+    if (currentMaxSev) {
+      bar.textContent = 'VIOLATION DETECTED — ' + currentMaxSev;
+      bar.classList.add('violation');
+      if (currentMaxSev === 'CRITICAL') bar.classList.add('alert-critical');
+      else if (currentMaxSev === 'HIGH') bar.classList.add('alert-high');
+    }
+  }
+});
 
 /* ── View 2: Event Stream ──────────────────────────────── */
 
@@ -1038,8 +1074,8 @@ async function pollUploadStatus() {
 function showToast(title, message, severity) {
   const toast = document.createElement('div');
   const bg = severity === 'CRITICAL' ? '#dc2626' : '#d97706';
-  toast.style.cssText = `background:${bg}; color:white; padding:16px; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); width:300px; transform:translateX(120%); transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);`;
-  toast.innerHTML = `<div style="font-weight:bold; font-size:13px; margin-bottom:4px; text-transform:uppercase;">${title}</div><div style="font-size:12px; opacity:0.9;">${message}</div>`;
+  toast.style.cssText = `background:${bg}; color:white; padding:8px 12px; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.15); width:220px; transform:translateX(120%); transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);`;
+  toast.innerHTML = `<div style="font-weight:bold; font-size:11px; margin-bottom:2px; text-transform:uppercase;">${title}</div><div style="font-size:10px; opacity:0.9;">${message}</div>`;
   document.getElementById('toast-container').appendChild(toast);
   
   // slide in

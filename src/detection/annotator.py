@@ -159,7 +159,7 @@ def annotate_video_with_green_borders(
                         # Draw colored border
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
                         # Label with severity
-                        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
         out.write(frame)
 

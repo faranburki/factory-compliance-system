@@ -65,7 +65,7 @@ processing_status = {
 
 CURRENT_STATE = {
     "status": "idle",
-    "clip_id": "0_te1.mp4",
+    "clip_id": None,
     "events_this_session": 0,
     "max_severity": None,
     "has_violation": False,
@@ -76,7 +76,7 @@ CURRENT_STATE = {
 POLICY_RULES: list[dict] = []
 alert_queue: AlertQueue = create_alert_queue()
 recent_alerts: list[dict] = []  # In-memory buffer of recent HIGH/CRITICAL alerts
-_last_clip_id: str = ""
+_last_clip_id: str | None = None
 
 
 # ── Startup ─────────────────────────────────────────────────────────────
@@ -84,6 +84,16 @@ _last_clip_id: str = ""
 def load_policy():
 	"""Load policy rules from JSON on startup (Option A from the guide)."""
 	global POLICY_RULES, _last_clip_id
+
+	# Clear the database on startup so there's no previous video/alerts
+	if DB_PATH.exists():
+		try:
+			# Also ensure connections are closed before unlinking if possible, 
+			# but since it's startup, no connections exist yet.
+			DB_PATH.unlink()
+			print(f"[startup] Cleared previous database at {DB_PATH}")
+		except Exception as exc:
+			print(f"[startup] Warning: Could not clear database: {exc}")
 
 	# Initialize the database
 	initialize_database(DB_PATH)
@@ -99,11 +109,14 @@ def load_policy():
 	else:
 		print(f"[startup] No policy_rules.json found at {POLICY_RULES_JSON}")
 
-	# Determine last clip_id from existing events
+	# Determine last clip_id from existing events (which should be empty now)
 	events = fetch_events(DB_PATH)
 	if events:
 		CURRENT_STATE["clip_id"] = events[0].clip_id
 		_last_clip_id = events[0].clip_id
+	else:
+		CURRENT_STATE["clip_id"] = None
+		_last_clip_id = None
 
 # ── API Routes ──────────────────────────────────────────────────────────
 
@@ -195,8 +208,6 @@ def get_events_live():
 
 	# Determine the latest clip from CURRENT_STATE instead of events
 	_last_clip_id = CURRENT_STATE.get("clip_id")
-	if not _last_clip_id and events:
-		_last_clip_id = events[0].clip_id
 
 	if not _last_clip_id:
 		return {
@@ -209,7 +220,9 @@ def get_events_live():
 		}
 
 	# Get events for the currently playing clip only
-	clip_events = [e for e in events if e.clip_id == _last_clip_id]
+	# DB stores original filename (e.g. video.mp4), but clip_id is annotated filename (e.g. video_annotated.mp4)
+	base_clip_id = _last_clip_id.replace("_annotated", "") if _last_clip_id else None
+	clip_events = [e for e in events if e.clip_id == base_clip_id]
 
 	# Determine alert status
 	severities = [e.severity for e in clip_events]
@@ -220,11 +233,23 @@ def get_events_live():
 			max_severity = s
 			break
 
+	# Inject time_sec into the event dictionaries
+	import re
+	event_dicts = []
+	for e in clip_events:
+		e_dict = e.model_dump()
+		match = re.search(r'at frame (\d+)', e.event_description)
+		if match:
+			e_dict['time_sec'] = int(match.group(1)) / 30.0
+		else:
+			e_dict['time_sec'] = 0.0
+		event_dicts.append(e_dict)
+
 	return {
 		"status": "alert" if max_severity in ("HIGH", "CRITICAL") else ("violation" if has_violation else "idle"),
 		"clip_id": _last_clip_id,
 		"events_this_session": len(events),
-		"detections": [e.model_dump() for e in clip_events[:20]],
+		"detections": event_dicts,
 		"has_violation": has_violation,
 		"max_severity": max_severity,
 	}
