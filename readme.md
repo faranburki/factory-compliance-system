@@ -125,4 +125,4 @@ Then open `http://localhost:8000` in your browser.
 
 ## Demo
 
-Demo video: [link to be added before submission]
+Demo video: https://youtu.be/acF2zScHUVU
