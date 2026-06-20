@@ -1,45 +1,64 @@
-"""Route report events to SQLite and the in-process alert queue."""
+"""
+Module 3 — Escalation Pipeline | route_event.py
+Routes detected violations based on their dynamically looked-up severity tier.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
+import uuid
+from datetime import datetime, timezone
+from typing import Any
 
-from policy_parsing.schema import BehaviorClass
-from reports.db import insert_event
-from reports.schema import ReportEvent
-from severity.classify_severity import classify_severity
-
-from .alert_queue import AlertQueue
-
-
-def build_report_event(
-	clip_id: str,
-	zone: str,
-	behavior_class: BehaviorClass,
-	policy_rule_ref: str,
-	event_description: str,
-	*,
-	escalation_action: str | None = None,
-) -> ReportEvent:
-	"""Create a fully populated ReportEvent with auto-generated event_id and timestamp."""
-	severity = classify_severity(behavior_class)
-	if escalation_action is None:
-		escalation_action = "Queued for real-time alert" if severity in {"HIGH", "CRITICAL"} else "Logged to database"
-	return ReportEvent(
-		clip_id=clip_id,
-		zone=zone,
-		behavior_class=behavior_class,
-		policy_rule_ref=policy_rule_ref,
-		event_description=event_description,
-		severity=severity,
-		escalation_action=escalation_action,
-	)
+from ..detection.run_detection import DetectionResult
+from ..severity.classify_severity import get_severity_for_behavior
+from .alert_queue import push_alert
 
 
-def route_event(db_path: str | Path, event: ReportEvent, alert_queue: AlertQueue | None = None) -> ReportEvent:
-	"""Persist every event to SQLite and queue HIGH/CRITICAL events."""
+def create_event_payload(detection: DetectionResult, severity: str) -> dict[str, Any]:
+	"""
+	Format a raw detection result into a standardized database/alert event schema.
 
-	insert_event(db_path, event)
-	if alert_queue is not None and event.severity in {"HIGH", "CRITICAL"}:
-		alert_queue.push(event)
-	return event
+	Args:
+		detection: The unified detection result.
+		severity: The corresponding risk severity tier.
+
+	Returns:
+		A standardized event dictionary payload.
+	"""
+	return {
+		"event_id": str(uuid.uuid4()),
+		# Store time in ISO 8601 format with UTC timezone for consistency
+		"timestamp": datetime.now(timezone.utc).isoformat(),
+		"behavior_class": detection.behavior_class,
+		"severity": severity,
+		"policy_rule_ref": detection.policy_rule_ref,
+		"event_description": detection.event_description,
+		"zone": detection.zone,
+		"confidence": detection.confidence,
+		"clip_id": detection.clip_id,
+		"frame_index": detection.frame_index,
+		"needs_review": detection.needs_review,
+	}
+
+
+def route_detection_event(detection: DetectionResult) -> dict[str, Any]:
+	"""
+	Determine the severity of a detection and route it accordingly.
+	
+	HIGH and CRITICAL events are dispatched to the real-time alert queue.
+	All events are returned for persistence in the historical report database.
+
+	Args:
+		detection: The unified detection result to process.
+
+	Returns:
+		The fully formed event payload ready for database insertion.
+	"""
+	severity = get_severity_for_behavior(detection.behavior_class)
+	payload = create_event_payload(detection, severity)
+
+	# Escalation routing: only severe events get real-time attention
+	if severity in ("HIGH", "CRITICAL"):
+		push_alert(payload)
+
+	return payload

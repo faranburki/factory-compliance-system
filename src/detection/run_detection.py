@@ -1,7 +1,6 @@
-"""Orchestrate all four detectors on a video clip.
-
-Runs walkway, vest, panel, and forklift detectors and returns a unified
-list of detection results that can be fed into the severity→escalation pipeline.
+"""
+Module 1 — Detection Engine | run_detection.py
+Orchestrate all four detectors on a video clip.
 """
 
 from __future__ import annotations
@@ -24,7 +23,12 @@ POLICY_RULES_JSON = _PROJECT_ROOT / "outputs" / "policy_rules.json"
 
 
 def get_policy_rules() -> dict[str, dict]:
-	"""Load policy rules from JSON dynamically."""
+	"""
+	Load policy rules from JSON dynamically.
+
+	Returns:
+		A dictionary mapping behavior_class names to their full rule dictionaries.
+	"""
 	if not POLICY_RULES_JSON.exists():
 		return {}
 	try:
@@ -40,7 +44,16 @@ def get_policy_rules() -> dict[str, dict]:
 
 
 def _match_policy_rule(keyword: str, rules: dict[str, dict]) -> tuple[str | None, str, list[str]]:
-	"""Match a detector keyword to the dynamically loaded policy rule."""
+	"""
+	Match a detector keyword to the dynamically loaded policy rule.
+
+	Args:
+		keyword: A substring indicative of the behavior (e.g. 'walkway', 'vest').
+		rules: The dictionary of active policy rules.
+
+	Returns:
+		A tuple containing (behavior_class, policy_rule_ref, observable_indicators).
+	"""
 	for bc, rule in rules.items():
 		if keyword.lower() in bc.lower() or keyword.lower() in rule.get("rule_text", "").lower():
 			pr = rule.get("policy_rule_ref", "Unknown Section")
@@ -63,6 +76,9 @@ class DetectionResult:
 	person_box: tuple[int, int, int, int] | None = None
 
 	def to_dict(self) -> dict:
+		"""
+		Convert unified detection result to a standard dictionary.
+		"""
 		return {
 			"behavior_class": self.behavior_class,
 			"policy_rule_ref": self.policy_rule_ref,
@@ -88,7 +104,8 @@ def run_all_detectors(
 	skip_vision: bool = False,
 	step_callback = None,
 ) -> list[DetectionResult]:
-	"""Run all four detectors on a video clip and return unified results.
+	"""
+	Run all four detectors on a video clip and return unified results.
 
 	Args:
 		video_path: Path to the video file.
@@ -100,6 +117,7 @@ def run_all_detectors(
 		model_name: YOLO model name/path.
 		confidence_threshold: Minimum detection confidence.
 		skip_vision: If True, skip Groq vision-based detectors (panel, forklift).
+		step_callback: Optional callback function for reporting progress.
 
 	Returns:
 		List of DetectionResult objects, one per detected violation.
