@@ -1,14 +1,10 @@
-"""
-Module 1 — Policy Parsing | verify_ground_truth.py
-Provides ground-truth reference rules and helpers to verify LLM extraction accuracy.
-"""
+"""Ground-truth reference and comparison helpers for policy-rule extraction."""
 
 from __future__ import annotations
 
 from .schema import PolicyRule, PolicyRuleExtraction
 
 
-# Manually built ground truth matching the original compliance manual specifications
 GROUND_TRUTH = PolicyRuleExtraction(
 	rules=[
 		PolicyRule(
@@ -48,39 +44,18 @@ GROUND_TRUTH = PolicyRuleExtraction(
 
 
 def get_ground_truth_rules() -> PolicyRuleExtraction:
-	"""
-	Return the hand-built ground-truth rule set.
+	"""Return the hand-built ground-truth rule set from the policy manual."""
 
-	Returns:
-		A PolicyRuleExtraction object containing the ground truth definitions.
-	"""
 	return GROUND_TRUTH
 
 
 def _normalize(value: str) -> str:
-	"""
-	Normalize string format by collapsing extra spaces and converting to lowercase.
-
-	Args:
-		value: The string to normalize.
-
-	Returns:
-		The normalized string.
-	"""
 	return " ".join(value.split()).strip().lower()
 
 
 def compare_policy_rules(extracted: PolicyRuleExtraction, expected: PolicyRuleExtraction | None = None) -> list[str]:
-	"""
-	Compare extracted rules against the hand-built reference field by field.
+	"""Compare extracted rules against the hand-built reference field by field."""
 
-	Args:
-		extracted: The structured rules extracted by the LLM.
-		expected: Optional ground truth rules to compare against. Defaults to GROUND_TRUTH.
-
-	Returns:
-		A list of strings detailing any mismatched fields or missing rules.
-	"""
 	expected_rules = (expected or GROUND_TRUTH).rules
 	extracted_by_class = {rule.behavior_class: rule for rule in extracted.rules}
 	expected_by_class = {rule.behavior_class: rule for rule in expected_rules}
@@ -97,8 +72,6 @@ def compare_policy_rules(extracted: PolicyRuleExtraction, expected: PolicyRuleEx
 		for field_name in ("policy_rule_ref", "rule_text", "source_excerpt"):
 			extracted_value = _normalize(getattr(extracted_rule, field_name))
 			expected_value = _normalize(getattr(expected_rule, field_name))
-			
-			# Use normalized strings to ignore minor whitespace or casing disparities
 			if extracted_value != expected_value:
 				mismatches.append(
 					f"{behavior_class} {field_name} mismatch: expected {getattr(expected_rule, field_name)!r}, got {getattr(extracted_rule, field_name)!r}",

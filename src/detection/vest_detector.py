@@ -1,6 +1,8 @@
-"""
-Module 1 — Detection Engine | vest_detector.py
-Vest color detector for identifying unauthorized equipment intervention.
+"""Vest color detector for identifying unauthorized equipment intervention.
+
+Class 1 — Unauthorized Intervention: A person interacting with equipment
+while wearing a red-black vest (or any non-green vest) is a violation.
+Uses OpenCV HSV color masking on the torso region of detected persons.
 """
 
 from __future__ import annotations
@@ -27,14 +29,10 @@ class VestDetection:
 	red_ratio: float
 
 	def to_dict(self) -> dict:
-		"""
-		Convert detection object to a standard dictionary format.
-		"""
 		return asdict(self)
 
 
-# Policy Section 4.2 — green vest is the sole observable indicator
-# of authorized intervention status
+# HSV ranges for green vest detection
 GREEN_HSV_LOW = np.array([35, 40, 40])
 GREEN_HSV_HIGH = np.array([85, 255, 255])
 
@@ -50,16 +48,7 @@ BLACK_HSV_HIGH = np.array([180, 255, 50])
 
 
 def _extract_torso_region(frame: np.ndarray, box: tuple[int, int, int, int]) -> np.ndarray | None:
-	"""
-	Crop the upper-middle portion of a person bounding box (torso area).
-
-	Args:
-		frame: The full image frame.
-		box: A tuple of (x1, y1, x2, y2) defining the person.
-
-	Returns:
-		The cropped torso image as a numpy array, or None if invalid dimensions.
-	"""
+	"""Crop the upper-middle portion of a person bounding box (torso area)."""
 	x1, y1, x2, y2 = box
 	height = y2 - y1
 	width = x2 - x1
@@ -73,7 +62,7 @@ def _extract_torso_region(frame: np.ndarray, box: tuple[int, int, int, int]) -> 
 	torso_left = x1 + int(width * 0.1)
 	torso_right = x2 - int(width * 0.1)
 
-	# Clamp to frame boundaries to prevent OpenCV slicing errors
+	# Clamp to frame boundaries
 	h, w = frame.shape[:2]
 	torso_top = max(0, torso_top)
 	torso_bottom = min(h, torso_bottom)
@@ -87,14 +76,9 @@ def _extract_torso_region(frame: np.ndarray, box: tuple[int, int, int, int]) -> 
 
 
 def classify_vest_color(torso: np.ndarray) -> tuple[Literal["green", "red-black", "unknown"], float, float]:
-	"""
-	Classify the dominant vest color from a torso crop using HSV masking.
+	"""Classify the dominant vest color from a torso crop using HSV masking.
 
-	Args:
-		torso: Cropped torso image array.
-
-	Returns:
-		A tuple containing (color_label, green_ratio, red_black_ratio).
+	Returns (color_label, green_ratio, red_black_ratio).
 	"""
 	hsv = cv2.cvtColor(torso, cv2.COLOR_BGR2HSV)
 	total_pixels = hsv.shape[0] * hsv.shape[1]
@@ -137,18 +121,7 @@ def classify_vest_violations(
 	*,
 	frame_index: int = 0,
 ) -> list[VestDetection]:
-	"""
-	Classify vest color for each detected person in a frame.
-
-	Args:
-		frame: The video frame.
-		person_detections: A list of detected persons.
-		walkway_polygon: The safe walkway boundary polygon.
-		frame_index: Current frame index.
-
-	Returns:
-		A list of VestDetection results.
-	"""
+	"""Classify vest color for each detected person in a frame."""
 	results: list[VestDetection] = []
 
 	for detection in person_detections:
@@ -207,18 +180,7 @@ def detect_vest_violations_for_frame(
 	confidence_threshold: float = 0.25,
 	frame_index: int = 0,
 ) -> list[VestDetection]:
-	"""
-	Detect vest color violations in a single frame.
-
-	Args:
-		frame: The video frame.
-		model_name: The YOLO model.
-		confidence_threshold: Cutoff for valid YOLO person detections.
-		frame_index: Current frame index.
-
-	Returns:
-		A list of VestDetection instances.
-	"""
+	"""Detect vest color violations in a single frame."""
 	person_detections = detect_people(frame, model_name=model_name, confidence_threshold=confidence_threshold)
 	
 	h, w = frame.shape[:2]
@@ -235,19 +197,7 @@ def detect_vest_violations_in_video(
 	model_name: str = "yolov8n.pt",
 	confidence_threshold: float = 0.25,
 ) -> list[VestDetection]:
-	"""
-	Run vest color detection over sampled frames from a video.
-
-	Args:
-		video_path: Path to the video file.
-		stride: Step interval for sampling frames.
-		max_frames: Optional cap on the number of frames evaluated.
-		model_name: YOLO model file name.
-		confidence_threshold: Cutoff for valid YOLO person detections.
-
-	Returns:
-		An aggregated list of VestDetection objects.
-	"""
+	"""Run vest color detection over sampled frames from a video."""
 	violations: list[VestDetection] = []
 	for frame_index, frame in iter_video_frames(video_path, stride=stride, max_frames=max_frames):
 		violations.extend(

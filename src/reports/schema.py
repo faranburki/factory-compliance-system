@@ -1,43 +1,31 @@
-"""
-Module 4 — Reporting | schema.py
-Defines the SQLite schema and initialization logic for the historical database.
-"""
+"""Schema for report events written to SQLite and surfaced in the dashboard."""
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
+import uuid
+from datetime import datetime, timezone
+
+from pydantic import BaseModel, Field
+
+from policy_parsing.schema import BehaviorClass
+from severity.classify_severity import SeverityTier
 
 
-def init_db(db_path: str | Path) -> None:
-	"""
-	Initialize the SQLite database schema if it doesn't already exist.
+def _new_event_id() -> str:
+	return str(uuid.uuid4())
 
-	Args:
-		db_path: Path to the SQLite database file.
-	"""
-	path = Path(db_path)
-	path.parent.mkdir(parents=True, exist_ok=True)
-	
-	with sqlite3.connect(path) as conn:
-		# Use a comprehensive schema to track all necessary event context
-		conn.execute(
-			"""
-			CREATE TABLE IF NOT EXISTS compliance_events (
-				event_id TEXT PRIMARY KEY,
-				timestamp TEXT NOT NULL,
-				behavior_class TEXT NOT NULL,
-				severity TEXT NOT NULL,
-				policy_rule_ref TEXT,
-				event_description TEXT,
-				zone TEXT,
-				confidence REAL,
-				clip_id TEXT,
-				frame_index INTEGER,
-				needs_review BOOLEAN DEFAULT 0
-			)
-			"""
-		)
-		# Add indices to optimize common reporting queries (filtering by time or severity)
-		conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON compliance_events(timestamp)")
-		conn.execute("CREATE INDEX IF NOT EXISTS idx_severity ON compliance_events(severity)")
+
+def _now_iso() -> str:
+	return datetime.now(timezone.utc).isoformat()
+
+
+class ReportEvent(BaseModel):
+	event_id: str = Field(default_factory=_new_event_id, description="Unique identifier for this violation event.")
+	timestamp: str = Field(default_factory=_now_iso, description="Wall-clock time the violation was detected (ISO 8601).")
+	clip_id: str = Field(..., description="Source video clip identifier.")
+	zone: str = Field(..., description="Facility zone label.")
+	behavior_class: BehaviorClass = Field(..., description="Detected unsafe behavior class.")
+	policy_rule_ref: str = Field(..., description="Policy section reference for the rule.")
+	event_description: str = Field(..., description="Plain-English description of what was observed.")
+	severity: SeverityTier = Field(..., description="Severity tier assigned to the event.")
+	escalation_action: str = Field(..., description="What the escalation pipeline did with the event.")

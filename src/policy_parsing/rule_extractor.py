@@ -1,7 +1,4 @@
-"""
-Module 1 — Policy Parsing | rule_extractor.py
-Extracts structured compliance rules dynamically from plain text using the Groq API.
-"""
+"""Groq-based policy-rule extraction helpers."""
 
 from __future__ import annotations
 
@@ -17,15 +14,6 @@ from .schema import PolicyRuleExtraction
 
 
 def _get_api_key() -> str:
-	"""
-	Retrieve the Groq API key from environment variables.
-
-	Returns:
-		The API key as a string.
-
-	Raises:
-		RuntimeError: If GROQ_API_KEY is not set in the environment.
-	"""
 	api_key = os.getenv("GROQ_API_KEY")
 	if not api_key:
 		raise RuntimeError("Set GROQ_API_KEY before calling Groq")
@@ -33,21 +21,8 @@ def _get_api_key() -> str:
 
 
 def build_policy_rules_prompt(policy_text: str) -> str:
-	"""
-	Build the dynamic prompt used to extract all policy rules.
+	"""Build the dynamic prompt used to extract all policy rules."""
 
-	Args:
-		policy_text: The full text extracted from the policy document.
-
-	Returns:
-		A formatted prompt string containing instructions and the policy text.
-	"""
-	# The prompt deliberately does not name the four behavior classes.
-	# The LLM must discover them independently from the PDF text.
-	# This satisfies the assessment requirement: "behavioral categories
-	# must be derived from the policy document through your parsing
-	# pipeline, not manually transcribed as hard-coded strings."
-	# (Intern Assessment AI — Module 1, Policy Grounding Requirement)
 	return f"""You are an AI tasked with analyzing an occupational health and safety policy to extract compliance rules for automated video monitoring.
 
 Task:
@@ -78,26 +53,13 @@ Policy text:
 
 
 def extract_policy_rules(policy_text: str, *, model: str = "llama-3.1-8b-instant") -> PolicyRuleExtraction:
-	"""
-	Send a prompt to Groq and parse the structured dynamic policy-rule response.
+	"""Send one prompt to Groq and parse the structured dynamic policy-rule response."""
 
-	Args:
-		policy_text: The text to analyze.
-		model: The language model version to query.
-
-	Returns:
-		A populated PolicyRuleExtraction object containing the parsed rules.
-
-	Raises:
-		RuntimeError: If the groq package is not installed.
-	"""
 	if Groq is None:
 		raise RuntimeError("groq is not installed in the current Python environment")
 
 	client = Groq(api_key=_get_api_key())
 	prompt = build_policy_rules_prompt(policy_text)
-	
-	# Instruct the API to return standard JSON to safely populate the Pydantic schema
 	response = client.chat.completions.create(
 		model=model,
 		messages=[
@@ -119,31 +81,16 @@ def extract_policy_rules(policy_text: str, *, model: str = "llama-3.1-8b-instant
 
 
 def write_policy_rules_json(extraction: PolicyRuleExtraction, output_path: str | Path) -> Path:
-	"""
-	Write the extracted rules to a JSON file on disk.
+	"""Write the extracted rules to a JSON file on disk."""
 
-	Args:
-		extraction: The structured extraction object.
-		output_path: Path where the JSON file should be saved.
-
-	Returns:
-		The absolute or relative path to the saved JSON file.
-	"""
 	path = Path(output_path)
-	# Ensure the output directory structure exists before writing
 	path.parent.mkdir(parents=True, exist_ok=True)
 	path.write_text(extraction.model_dump_json(indent=2), encoding="utf-8")
 	return path
 
 
 def review_policy_rules(extraction: PolicyRuleExtraction) -> str:
-	"""
-	Format the Groq output so it can be sanity-checked by eye.
+	"""Format the Groq output so it can be sanity-checked by eye."""
 
-	Args:
-		extraction: The structured extraction object.
-
-	Returns:
-		A pretty-printed JSON string.
-	"""
 	return extraction.model_dump_json(indent=2)
+

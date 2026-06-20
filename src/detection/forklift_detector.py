@@ -1,6 +1,9 @@
-"""
-Module 1 — Detection Engine | forklift_detector.py
-Forklift overload detector for counting blocks on forklift forks using YOLO and Groq.
+"""Forklift overload detector for counting blocks on forklift forks.
+
+Class 3 — Carrying Overload with Forklift: Uses YOLO to detect vehicles
+and the Groq vision API to count standardized blocks on the forks.
+A count of 3 or more is a violation. Below the confidence threshold,
+the event is flagged for human review.
 """
 
 from __future__ import annotations
@@ -27,7 +30,7 @@ except ImportError:  # pragma: no cover
 
 from .video_utils import iter_video_frames
 
-# Policy Section 6.3.2 — three or more blocks constitutes an overload
+
 OVERLOAD_THRESHOLD = 3
 CONFIDENCE_THRESHOLD = 0.5
 
@@ -46,38 +49,17 @@ class ForkliftDetection:
 	description: str
 
 	def to_dict(self) -> dict:
-		"""
-		Convert detection object to a standard dictionary format.
-		"""
 		return asdict(self)
 
 
 @lru_cache(maxsize=2)
 def _load_model(model_name: str):
-	"""
-	Load and cache the YOLO model to prevent redundant initializations.
-
-	Args:
-		model_name: The name or path of the YOLO model file.
-
-	Raises:
-		RuntimeError: If ultralytics is not installed.
-	"""
 	if YOLO is None:
 		raise RuntimeError("ultralytics is not installed in the current Python environment")
 	return YOLO(model_name)
 
 
 def _get_groq_client() -> "Groq":
-	"""
-	Retrieve the Groq API key and initialize the client.
-
-	Returns:
-		An initialized Groq client instance.
-
-	Raises:
-		RuntimeError: If GROQ_API_KEY is not set or groq is not installed.
-	"""
 	if Groq is None:
 		raise RuntimeError("groq is not installed in the current Python environment")
 	api_key = os.getenv("GROQ_API_KEY", "")
@@ -87,16 +69,7 @@ def _get_groq_client() -> "Groq":
 
 
 def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 512) -> str:
-	"""
-	Resize and encode a frame as a base64 JPEG string for the Groq API.
-
-	Args:
-		frame: The image array to encode.
-		max_side: Maximum dimension for the scaled image.
-
-	Returns:
-		Base64 encoded string of the JPEG image.
-	"""
+	"""Resize and encode a frame as a base64 JPEG string for the Groq API."""
 	h, w = frame.shape[:2]
 	scale = min(max_side / max(h, w), 1.0)
 	if scale < 1.0:
@@ -111,17 +84,7 @@ def detect_vehicles(
 	model_name: str = "yolov8n.pt",
 	confidence_threshold: float = 0.25,
 ) -> list[tuple[int, int, int, int]]:
-	"""
-	Detect vehicles (potential forklifts) in a frame using YOLO.
-
-	Args:
-		frame: The video frame to process.
-		model_name: The YOLO model to use.
-		confidence_threshold: Cutoff for valid vehicle detections.
-
-	Returns:
-		A list of bounding box tuples identifying vehicles.
-	"""
+	"""Detect vehicles (potential forklifts) in a frame using YOLO."""
 	model = _load_model(model_name)
 	results = model.predict(frame, conf=confidence_threshold, verbose=False)
 	vehicle_boxes: list[tuple[int, int, int, int]] = []
@@ -148,22 +111,15 @@ def count_blocks_with_groq(
 	*,
 	model: str = "llama-3.2-90b-vision-preview",
 ) -> tuple[int, float, str]:
-	"""
-	Use Groq vision to count standardized blocks on a forklift.
+	"""Use Groq vision to count standardized blocks on a forklift.
 
-	Args:
-		frame: The video frame containing the forklift.
-		vehicle_box: Bounding box of the vehicle, if detected.
-		model: The Groq vision model to use.
-
-	Returns:
-		A tuple containing (block_count, confidence, description).
+	Returns (block_count, confidence, description).
 	"""
 	# Crop to vehicle region if available, otherwise use full frame
 	if vehicle_box is not None:
 		x1, y1, x2, y2 = vehicle_box
 		h, w = frame.shape[:2]
-		# Add padding around the vehicle to ensure the forklift load is not clipped
+		# Add padding around the vehicle
 		pad = 30
 		x1 = max(0, x1 - pad)
 		y1 = max(0, y1 - pad)
@@ -234,21 +190,7 @@ def detect_forklift_violations_for_frame(
 	overload_threshold: int = OVERLOAD_THRESHOLD,
 	review_confidence_threshold: float = CONFIDENCE_THRESHOLD,
 ) -> list[ForkliftDetection]:
-	"""
-	Detect forklift overload violations in a single frame.
-
-	Args:
-		frame: The video frame to process.
-		frame_index: The index of the frame being processed.
-		model_name: The YOLO model used to detect vehicles.
-		vision_model: The Groq vision model used to count blocks.
-		confidence_threshold: Cutoff for valid vehicle detections.
-		overload_threshold: Number of blocks that constitutes an overload.
-		review_confidence_threshold: Flag the detection for review if confidence is lower than this.
-
-	Returns:
-		A list of ForkliftDetection instances for this frame.
-	"""
+	"""Detect forklift overload violations in a single frame."""
 	detections: list[ForkliftDetection] = []
 
 	# First try to detect vehicles with YOLO
@@ -320,22 +262,10 @@ def detect_forklift_violations_in_video(
 	vision_model: str = "llama-3.2-90b-vision-preview",
 	confidence_threshold: float = 0.25,
 ) -> list[ForkliftDetection]:
-	"""
-	Run forklift overload detection over sampled frames from a video.
+	"""Run forklift overload detection over sampled frames from a video.
 
 	Uses a larger stride and fewer frames since each frame may require
 	a Groq API call for block counting.
-
-	Args:
-		video_path: Path to the video file.
-		stride: Step interval for sampling frames.
-		max_frames: Optional cap on the number of frames evaluated.
-		model_name: YOLO model file name.
-		vision_model: Groq vision model name.
-		confidence_threshold: Cutoff for valid vehicle detections.
-
-	Returns:
-		An aggregated list of ForkliftDetection objects.
 	"""
 	all_detections: list[ForkliftDetection] = []
 	for frame_index, frame in iter_video_frames(video_path, stride=stride, max_frames=max_frames):

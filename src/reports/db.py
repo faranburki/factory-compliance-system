@@ -1,97 +1,113 @@
-"""
-Module 4 — Reporting | db.py
-Provides CRUD operations for historical compliance events in the SQLite database.
-"""
+"""SQLite helpers for report events."""
 
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Optional
 
-from .schema import init_db
+from .schema import ReportEvent
 
 
-class ReportDB:
-	"""
-	Manager for persisting and querying historical compliance events.
-	"""
+CREATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS events (
+    event_id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    clip_id TEXT NOT NULL,
+    zone TEXT NOT NULL,
+    behavior_class TEXT NOT NULL,
+    policy_rule_ref TEXT NOT NULL,
+    event_description TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    escalation_action TEXT NOT NULL
+)
+"""
 
-	def __init__(self, db_path: str | Path):
-		"""
-		Initialize the database connection wrapper.
 
-		Args:
-			db_path: Path to the SQLite database.
-		"""
-		self.db_path = Path(db_path)
-		init_db(self.db_path)
+def get_connection(db_path: str | Path) -> sqlite3.Connection:
+	path = Path(db_path)
+	path.parent.mkdir(parents=True, exist_ok=True)
+	return sqlite3.connect(path)
 
-	def insert_event(self, event: dict[str, Any]) -> None:
-		"""
-		Insert a new compliance event into the historical log.
 
-		Args:
-			event: Standardized event dictionary.
-		"""
-		with sqlite3.connect(self.db_path) as conn:
-			conn.execute(
-				"""
-				INSERT INTO compliance_events (
-					event_id, timestamp, behavior_class, severity, policy_rule_ref,
-					event_description, zone, confidence, clip_id, frame_index, needs_review
-				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-				""",
-				(
-					event["event_id"],
-					event["timestamp"],
-					event["behavior_class"],
-					event["severity"],
-					event.get("policy_rule_ref"),
-					event.get("event_description"),
-					event.get("zone"),
-					event.get("confidence"),
-					event.get("clip_id"),
-					event.get("frame_index"),
-					1 if event.get("needs_review") else 0,
-				),
-			)
+def initialize_database(db_path: str | Path) -> None:
+	with get_connection(db_path) as connection:
+		connection.execute(CREATE_TABLE_SQL)
+		connection.commit()
 
-	def get_recent_events(self, limit: int = 50) -> list[dict[str, Any]]:
-		"""
-		Retrieve the most recent compliance events.
 
-		Args:
-			limit: Maximum number of rows to return.
+def insert_event(db_path: str | Path, event: ReportEvent) -> None:
+	initialize_database(db_path)
+	with get_connection(db_path) as connection:
+		connection.execute(
+			"""
+			INSERT OR REPLACE INTO events (
+			    event_id,
+			    timestamp,
+			    clip_id,
+			    zone,
+			    behavior_class,
+			    policy_rule_ref,
+			    event_description,
+			    severity,
+			    escalation_action
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			""",
+			(
+				event.event_id,
+				event.timestamp,
+				event.clip_id,
+				event.zone,
+				event.behavior_class,
+				event.policy_rule_ref,
+				event.event_description,
+				event.severity,
+				event.escalation_action,
+			),
+		)
+		connection.commit()
 
-		Returns:
-			A list of dictionary records representing the events.
-		"""
-		with sqlite3.connect(self.db_path) as conn:
-			# Row factory allows dict-like access to columns
-			conn.row_factory = sqlite3.Row
-			cursor = conn.execute(
-				"SELECT * FROM compliance_events ORDER BY timestamp DESC LIMIT ?",
-				(limit,),
-			)
-			return [dict(row) for row in cursor.fetchall()]
 
-	def get_events_by_severity(self, severity: str, limit: int = 50) -> list[dict[str, Any]]:
-		"""
-		Retrieve recent events filtered by a specific severity tier.
+def fetch_events(
+	db_path: str | Path,
+	*,
+	severity: Optional[str] = None,
+	behavior_class: Optional[str] = None,
+) -> list[ReportEvent]:
+	"""Fetch events from the database with optional filtering."""
+	initialize_database(db_path)
+	query = "SELECT event_id, timestamp, clip_id, zone, behavior_class, policy_rule_ref, event_description, severity, escalation_action FROM events"
+	conditions: list[str] = []
+	params: list[str] = []
 
-		Args:
-			severity: The severity tier to filter on (e.g. HIGH).
-			limit: Maximum number of rows to return.
+	if severity:
+		conditions.append("severity = ?")
+		params.append(severity)
+	if behavior_class:
+		conditions.append("behavior_class = ?")
+		params.append(behavior_class)
 
-		Returns:
-			A list of dictionary records representing the filtered events.
-		"""
-		with sqlite3.connect(self.db_path) as conn:
-			conn.row_factory = sqlite3.Row
-			cursor = conn.execute(
-				"SELECT * FROM compliance_events WHERE severity = ? ORDER BY timestamp DESC LIMIT ?",
-				(severity, limit),
-			)
-			return [dict(row) for row in cursor.fetchall()]
+	if conditions:
+		query += " WHERE " + " AND ".join(conditions)
+
+	query += " ORDER BY timestamp DESC"
+
+	with get_connection(db_path) as connection:
+		rows = connection.execute(query, params).fetchall()
+
+	return [
+		ReportEvent.model_validate(
+			{
+				"event_id": row[0],
+				"timestamp": row[1],
+				"clip_id": row[2],
+				"zone": row[3],
+				"behavior_class": row[4],
+				"policy_rule_ref": row[5],
+				"event_description": row[6],
+				"severity": row[7],
+				"escalation_action": row[8],
+			}
+		)
+		for row in rows
+	]
