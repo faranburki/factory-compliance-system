@@ -114,68 +114,6 @@ Then open `http://localhost:8000` in your browser.
 | Frontend | HTML / CSS / vanilla JS | Renders the dashboard interfaces, live feed, and statistical views |
 | Config | python-dotenv | Loads environment variables such as the Groq API key securely |
 
-## Repository Structure
-
-```text
-.env - Environment variables including Groq API key
-.gitignore - Git ignore definitions
-Compliance_Policy_Manual.pdf - Original policy document (legacy location)
-Intern_Assessment_AI.pdf - The original assessment instructions
-Master_Build_Guideee.pdf - Development build guide
-openh264-1.8.0-win64.dll - Cisco H264 codec for video serving (legacy location)
-progress.md - Project progression tracking
-readme.md - This file
-requirements.txt - Python package dependencies
-test.py - Temporary testing script
-yolov8n.pt - YOLOv8 nano model weights
-extract_rules.py - CLI entry point for the policy extraction pipeline
-data/policies/Compliance_Policy_Manual.pdf - Organized directory for policy documents
-data/videos/0_te1.mp4 - Video clip for testing walkway violations
-data/videos/0_te15.mp4 - Video clip for testing opened panel covers
-data/videos/0_te15_annotated.mp4 - Processed video clip with annotations
-data/videos/0_te1_annotated.mp4 - Processed video clip with annotations
-data/videos/0_te24.mp4 - Video clip for testing forklift overload
-data/videos/0_te24_annotated.mp4 - Processed video clip with annotations
-data/videos/1_te10.mp4 - Video clip for testing unauthorized intervention
-data/videos/1_te10_annotated.mp4 - Processed video clip with annotations
-outputs/policy_rules.json - JSON output of dynamically extracted rules
-outputs/reports.db - SQLite database storing historical event logs
-outputs/test_events.sqlite - Temporary SQLite database for testing
-src/__init__.py - Package initialization
-src/config.py - Core configuration variables and path definitions
-src/download_dll.py - Script to acquire the required OpenH264 codec
-src/openh264-1.8.0-win64.dll - Codec inside src directory
-src/run_pipeline.py - CLI entry point to run detection on a video
-src/yolov8m.pt - YOLOv8 medium model weights
-src/yolov8n.pt - YOLOv8 nano model weights inside src directory
-src/dashboard/__init__.py - Dashboard package initialization
-src/dashboard/main.py - FastAPI application defining all web endpoints
-src/dashboard/static/index.html - Dashboard frontend markup
-src/dashboard/static/script.js - Dashboard frontend logic
-src/dashboard/static/style.css - Dashboard frontend styling
-src/detection/__init__.py - Detection package initialization
-src/detection/annotator.py - Utilities for drawing severity-colored bounding boxes
-src/detection/forklift_detector.py - VLM detector for forklift overloads
-src/detection/panel_detector.py - VLM detector for opened panel covers
-src/detection/run_detection.py - Pipeline orchestrator for detection models
-src/detection/vest_detector.py - YOLO/OpenCV detector for safety vest colors
-src/detection/video_utils.py - Frame extraction and processing utilities
-src/detection/walkway_detector.py - YOLO detector for walkway zone violations
-src/escalation/__init__.py - Escalation package initialization
-src/escalation/alert_queue.py - In-memory queue for real-time alerts
-src/escalation/route_event.py - Router sending events to DB and alert queue
-src/policy_parsing/__init__.py - Policy package initialization
-src/policy_parsing/pdf_text_extractor.py - Wrapper for pdfplumber extraction
-src/policy_parsing/rule_extractor.py - Groq API integration for LLM rule generation
-src/policy_parsing/schema.py - Pydantic models for rule extraction
-src/policy_parsing/verify_ground_truth.py - Verifies extracted rules against expectations
-src/reports/__init__.py - Reports package initialization
-src/reports/db.py - SQLite database connection and query logic
-src/reports/export.py - Logic to export events to JSON and CSV
-src/reports/schema.py - Database table definitions
-src/severity/__init__.py - Severity package initialization
-src/severity/classify_severity.py - Mapper matching rules to their severity tier
-```
 
 ## Known Limitations
 
