@@ -99,7 +99,7 @@ def _load_model(model_name: str):
 	return YOLO(model_name)
 
 
-def detect_people(frame: np.ndarray, *, model_name: str = "yolov8n.pt", confidence_threshold: float = 0.25) -> list[PersonDetection]:
+def detect_people(frame: np.ndarray, *, model_name: str = "yolov8m.pt", confidence_threshold: float = 0.25) -> list[PersonDetection]:
 	"""Run YOLO person detection on a frame."""
 
 	model = _load_model(model_name)
@@ -134,7 +134,7 @@ def detect_walkway_violations_for_frame(
 	frame: np.ndarray,
 	polygon: list[tuple[int, int]],
 	*,
-	model_name: str = "yolov8n.pt",
+	model_name: str = "yolov8m.pt",
 	confidence_threshold: float = 0.25,
 	frame_index: int = 0,
 ) -> list[WalkwayDetection]:
@@ -150,7 +150,7 @@ def detect_walkway_violations_in_video(
 	*,
 	stride: int = 30,
 	max_frames: int | None = None,
-	model_name: str = "yolov8n.pt",
+	model_name: str = "yolov8m.pt",
 	confidence_threshold: float = 0.25,
 ) -> list[WalkwayDetection]:
 	"""Run walkway detection over sampled frames from a video."""

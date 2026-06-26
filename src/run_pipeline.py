@@ -102,7 +102,16 @@ def run_pipeline(
 
 		# ── Step 2 & 3: Severity + Escalation ──────────────────────
 		print(f"\n  Routing {len(detection_results)} event(s) through escalation pipeline...")
+		last_alert_frame: dict[str, int] = {}
+		
 		for det in detection_results:
+			# Debounce DB + Alert generation (max 1 per 60 frames / 2 seconds per behavior class)
+			if det.frame_index is not None:
+				last_frame = last_alert_frame.get(det.behavior_class, -999)
+				if det.frame_index - last_frame < 60:
+					continue  # Throttle: skip for this frame
+				last_alert_frame[det.behavior_class] = det.frame_index
+
 			report_event = build_report_event(
 				clip_id=det.clip_id,
 				zone=det.zone,

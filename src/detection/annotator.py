@@ -1,11 +1,15 @@
-"""Video annotator for drawing green borders on moving people.
+"""Video annotator for drawing colored borders on detected people.
 
-Supports severity-aware coloring: if a violation_frames dict is provided,
-bounding boxes on violation frames will be colored by severity level.
+Supports:
+  - Severity-aware coloring: violation frames are colored by severity level.
+  - Vest-aware coloring: persons wearing a green vest get a green box
+    labeled "Authorized Intervention"; red-black vest violators near
+    equipment get a red box labeled "Unauthorized Intervention".
 """
 
 from pathlib import Path
 import cv2
+import numpy as np
 from ultralytics import YOLO
 
 # Minimum bounding box height in pixels to count as a real person.
@@ -17,10 +21,10 @@ MIN_PERSON_HEIGHT_PX = 70
 # A dustbin might be ~50x25 = 1250px². A real person is 70x30+ = 2100px² minimum.
 MIN_PERSON_AREA_PX = 2000
 
-# Minimum aspect ratio (height / width). People are taller than wide.
-# A dustbin is roughly square (~1.0). A standing person is ~2.0-4.0.
-# A sitting/crouching person can be ~1.5+.
-MIN_ASPECT_RATIO = 1.5
+# Minimum aspect ratio (height / width). People are taller than wide, but when
+# crouching or bending over machinery, this ratio can easily drop below 1.0.
+# Lowered to 0.8 to ensure we don't hide bounding boxes of working personnel.
+MIN_ASPECT_RATIO = 0.8
 
 # BGR color map for severity tiers
 SEVERITY_COLORS = {
@@ -30,6 +34,10 @@ SEVERITY_COLORS = {
     "LOW":      (0, 255, 0),       # Green
 }
 DEFAULT_COLOR = (0, 255, 0)        # Green for no violation
+
+# ── Vest-specific colors (BGR) ──────────────────────────────────────
+AUTHORIZED_COLOR = (0, 255, 0)       # Green box for authorized (green vest)
+UNAUTHORIZED_COLOR = (0, 0, 255)     # Red box for unauthorized (red-black vest)
 
 def get_iou(boxA, boxB):
     """Calculate Intersection over Union for two bounding boxes."""
@@ -57,22 +65,31 @@ def annotate_video_with_green_borders(
     confidence_threshold: float = 0.35,
     progress_callback = None,
     violation_frames: dict[int, list[dict]] | None = None,
+    authorized_frames: dict[int, list[dict]] | None = None,
 ) -> None:
     """Read a video, detect people, draw colored borders around them, and save.
     
     Args:
         violation_frames: Optional dict mapping frame_index -> list of dicts:
             {"severity": str, "box": tuple[int, int, int, int] | None}
+        authorized_frames: Optional dict mapping frame_index -> list of dicts:
+            {"box": tuple[int, int, int, int]}
+            These are green-vest authorized persons that get a green box
+            labeled "Authorized Intervention".
     """
     input_path = Path(input_path)
     output_path = Path(output_path)
 
     if violation_frames is None:
         violation_frames = {}
+    if authorized_frames is None:
+        authorized_frames = {}
 
     print(f"Annotating {input_path.name} -> {output_path.name}...")
     if violation_frames:
         print(f"  Severity coloring enabled for {len(violation_frames)} violation frame(s)")
+    if authorized_frames:
+        print(f"  Authorized intervention markers enabled for {len(authorized_frames)} frame(s)")
 
     # Load YOLO model
     model = YOLO(model_name)
@@ -115,8 +132,8 @@ def annotate_video_with_green_borders(
             boxes = result.boxes
             if boxes is not None:
                 for box, cls in zip(boxes.xyxy, boxes.cls):
-                    # class 0 is 'person' in COCO
-                    if int(cls) == 0:
+                    cls_id = int(cls)
+                    if cls_id == 0:
                         x1, y1, x2, y2 = map(int, box[:4])
                         box_h = y2 - y1
                         box_w = x2 - x1
@@ -134,8 +151,27 @@ def annotate_video_with_green_borders(
                             continue
 
                         current_box = (x1, y1, x2, y2)
-                        
-                        # Determine box color for THIS specific person
+
+                        # ── Check if this person is AUTHORIZED (green vest) ──
+                        is_authorized = False
+                        auth_entries = authorized_frames.get(frame_idx, [])
+                        for a in auth_entries:
+                            a_box = a.get("box")
+                            if a_box is not None and get_iou(current_box, a_box) > 0.3:
+                                is_authorized = True
+                                break
+
+                        if is_authorized:
+                            # Green box + "Authorized Intervention" label
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), AUTHORIZED_COLOR, 3)
+                            cv2.putText(
+                                frame, "Person",
+                                (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5, AUTHORIZED_COLOR, 2,
+                            )
+                            continue  # skip violation coloring for this person
+
+                        # ── Check severity-based violation coloring ──────────
                         best_severity = None
                         best_rank = -1
                         violations_in_frame = violation_frames.get(frame_idx, [])
@@ -144,22 +180,51 @@ def annotate_video_with_green_borders(
                             v_box = v["box"]
                             v_sev = v["severity"]
                             
-                            # If the violation has no specific person box (like panel/forklift),
-                            # or if it overlaps strongly with this person, apply the severity
-                            if v_box is None or get_iou(current_box, v_box) > 0.4:
+                            # Only apply the severity if the violation has a bounding box that overlaps with this person
+                            if v_box is not None and get_iou(current_box, v_box) > 0.4:
                                 rank = severity_rank.get(v_sev, 0)
                                 if rank > best_rank:
                                     best_rank = rank
                                     best_severity = v_sev
 
-                        color = SEVERITY_COLORS.get(best_severity, DEFAULT_COLOR) if best_severity else DEFAULT_COLOR
-                        label = f"Person - {best_severity}" if best_severity else "Person"
-                        thickness = 4 if best_severity in ("CRITICAL", "HIGH") else 3
+                        if best_severity and best_severity in ("HIGH", "CRITICAL"):
+                            # Red box for vest violations
+                            color = UNAUTHORIZED_COLOR
+                            label = f"Person - {best_severity}"
+                            thickness = 4
+                        elif best_severity:
+                            color = SEVERITY_COLORS.get(best_severity, DEFAULT_COLOR)
+                            label = f"Person - {best_severity}"
+                            thickness = 3
+                        else:
+                            color = DEFAULT_COLOR
+                            label = "Person"
+                            thickness = 3
 
                         # Draw colored border
                         cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
                         # Label with severity
                         cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+                    # ── Forklift Annotation Logic ──
+                    elif cls_id in (2, 5, 7):
+                        x1, y1, x2, y2 = map(int, box[:4])
+                        best_severity = None
+                        best_rank = -1
+                        violations_in_frame = violation_frames.get(frame_idx, [])
+                        
+                        for v in violations_in_frame:
+                            if v.get("behavior_class", "") == "Carrying Overload with Forklift":
+                                v_sev = v["severity"]
+                                rank = severity_rank.get(v_sev, 0)
+                                if rank > best_rank:
+                                    best_rank = rank
+                                    best_severity = v_sev
+                        
+                        if best_severity:
+                            color = UNAUTHORIZED_COLOR if best_severity in ("HIGH", "CRITICAL") else SEVERITY_COLORS.get(best_severity, DEFAULT_COLOR)
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 4)
+                            cv2.putText(frame, f"Forklift - {best_severity}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
         out.write(frame)
 

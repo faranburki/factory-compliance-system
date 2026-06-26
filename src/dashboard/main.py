@@ -443,10 +443,12 @@ def process_uploaded_video(video_path: Path):
 		# 1. Run detection on raw video FIRST to find violations
 		processing_status["status"] = "detecting"
 		processing_status["detail"] = "Starting compliance detectors..."
+		authorized_detections: list[dict] = []
 		detection_results = run_all_detectors(
 			video_path,
 			skip_vision=False,
 			step_callback=update_detail,
+			authorized_out=authorized_detections,
 		)
 		
 		# 2. Build frame_index -> list[dict] map for annotation coloring
@@ -458,17 +460,13 @@ def process_uploaded_video(video_path: Path):
 		# Detectors sample every ~30 frames, so spread across the full stride window.
 		SPREAD = 30
 		
+		last_alert_frame: dict[str, int] = {}
+
 		for det in detection_results:
-			report_event = build_report_event(
-				clip_id=det.clip_id,
-				zone=det.zone,
-				behavior_class=det.behavior_class,
-				policy_rule_ref=det.policy_rule_ref,
-				event_description=det.event_description,
-			)
-			route_event(DB_PATH, report_event, alert_q)
-			
-			# Spread violation color across surrounding frames
+			# Determine severity dynamically so we can draw boxes even if we debounce DB entry
+			severity = classify_severity(det.behavior_class)
+
+			# 1. Spread violation color across surrounding frames (ALWAYS runs for every detection)
 			frame_idx = det.frame_index
 			if frame_idx is not None:
 				for f in range(max(1, frame_idx - SPREAD), frame_idx + SPREAD + 1):
@@ -477,13 +475,43 @@ def process_uploaded_video(video_path: Path):
 					# Check if a violation for this person box already exists in this frame
 					existing = next((v for v in violation_frames[f] if v["box"] == det.person_box), None)
 					if existing is None:
-						violation_frames[f].append({"severity": report_event.severity, "box": det.person_box})
-					elif severity_rank.get(report_event.severity, 0) > severity_rank.get(existing["severity"], 0):
-						existing["severity"] = report_event.severity
+						violation_frames[f].append({"severity": severity, "box": det.person_box, "behavior_class": det.behavior_class})
+					elif severity_rank.get(severity, 0) > severity_rank.get(existing["severity"], 0):
+						existing["severity"] = severity
+						existing["behavior_class"] = det.behavior_class
+
+			# 2. Debounce DB + Alert generation (max 1 per 60 frames / 2 seconds per behavior class)
+			if frame_idx is not None:
+				last_frame = last_alert_frame.get(det.behavior_class, -999)
+				if frame_idx - last_frame < 60:
+					continue  # Throttle: skip DB and Alert queue for this frame
+				last_alert_frame[det.behavior_class] = frame_idx
+
+			# 3. Create actual report event and escalate
+			report_event = build_report_event(
+				clip_id=det.clip_id,
+				zone=det.zone,
+				behavior_class=det.behavior_class,
+				policy_rule_ref=det.policy_rule_ref,
+				event_description=det.event_description,
+			)
+			route_event(DB_PATH, report_event, alert_q)
 		
 		print(f"  Built violation map: {len(violation_frames)} frames with violations")
+
+		# 3. Build authorized_frames map for green vest annotation
+		authorized_frames: dict[int, list[dict]] = {}
+		for auth in authorized_detections:
+			frame_idx = auth["frame_index"]
+			if frame_idx is not None:
+				for f in range(max(1, frame_idx - SPREAD), frame_idx + SPREAD + 1):
+					if f not in authorized_frames:
+						authorized_frames[f] = []
+					authorized_frames[f].append({"box": auth["person_box"]})
+		if authorized_frames:
+			print(f"  Built authorized map: {len(authorized_frames)} frames with authorized persons")
 		
-		# 3. Annotate video with severity-colored bounding boxes
+		# 4. Annotate video with severity-colored bounding boxes
 		processing_status["status"] = "annotating"
 		processing_status["detail"] = "Drawing severity-colored bounding boxes..."
 		annotated_path = DATA_DIR / f"{video_path.stem}_annotated.mp4"
@@ -492,6 +520,7 @@ def process_uploaded_video(video_path: Path):
 			annotated_path,
 			progress_callback=update_progress,
 			violation_frames=violation_frames,
+			authorized_frames=authorized_frames,
 		)
 		
 		# 4. Update dashboard state so it switches to the annotated video

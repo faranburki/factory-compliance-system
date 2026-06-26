@@ -45,7 +45,7 @@ def _get_groq_client() -> "Groq":
 	return Groq(api_key=api_key)
 
 
-def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 512) -> str:
+def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 1024) -> str:
 	"""Resize and encode a frame as a base64 JPEG string for the Groq API."""
 	h, w = frame.shape[:2]
 	scale = min(max_side / max(h, w), 1.0)
@@ -55,7 +55,7 @@ def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 512) -> str:
 	return base64.b64encode(buffer).decode("utf-8")
 
 
-def classify_panel_state(frame: np.ndarray, *, model: str = "llama-3.2-90b-vision-preview") -> PanelDetection:
+def classify_panel_state(frame: np.ndarray, *, model: str = "meta-llama/llama-4-scout-17b-16e-instruct") -> PanelDetection:
 	"""Use Groq vision to classify whether a panel cover is open or closed."""
 	client = _get_groq_client()
 	image_b64 = _encode_frame_base64(frame)
@@ -124,7 +124,7 @@ def detect_panel_violations_for_frame(
 	frame: np.ndarray,
 	*,
 	frame_index: int = 0,
-	model: str = "llama-3.2-90b-vision-preview",
+	model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 ) -> PanelDetection:
 	"""Check a single frame for open panel covers using Groq vision."""
 	try:
@@ -152,7 +152,7 @@ def detect_panel_violations_in_video(
 	*,
 	stride: int = 60,
 	max_frames: int | None = 5,
-	model: str = "llama-3.2-90b-vision-preview",
+	model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 ) -> list[PanelDetection]:
 	"""Run panel cover detection over sampled frames from a video.
 

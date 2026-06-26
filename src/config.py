@@ -24,7 +24,7 @@ GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 
 # ── Detection thresholds ────────────────────────────────────────────────
 PERSON_CONFIDENCE_THRESHOLD: float = 0.25
-YOLO_MODEL: str = "yolov8n.pt"
+YOLO_MODEL: str = "yolov8m.pt"
 FRAME_STRIDE: int = 30
 MAX_FRAMES: int | None = None
 
@@ -35,13 +35,23 @@ WALKWAY_RIGHT_X_RATIO: float = 0.88
 WALKWAY_OUTER_LEFT_RATIO: float = 0.02
 WALKWAY_OUTER_RIGHT_RATIO: float = 0.98
 
-# Vest detector HSV ranges
-GREEN_VEST_HSV_LOW = (35, 50, 50)
-GREEN_VEST_HSV_HIGH = (85, 255, 255)
+# Vest detector HSV ranges — two overlapping green ranges to handle
+# factory lighting variation (shadows, direct light, yellow-green vests)
+GREEN_VEST_HSV_LOW_1 = (25, 30, 30)
+GREEN_VEST_HSV_HIGH_1 = (70, 255, 255)
+GREEN_VEST_HSV_LOW_2 = (70, 20, 40)
+GREEN_VEST_HSV_HIGH_2 = (95, 255, 255)
+
 RED_VEST_HSV_LOW_1 = (0, 50, 50)
 RED_VEST_HSV_HIGH_1 = (10, 255, 255)
 RED_VEST_HSV_LOW_2 = (170, 50, 50)
 RED_VEST_HSV_HIGH_2 = (180, 255, 255)
+
+# Green pixel ratio threshold for vest classification
+GREEN_VEST_RATIO_THRESHOLD: float = 0.06
+
+# Debug mode: saves torso crops and green masks to outputs/vest_debug/
+VEST_DEBUG_MODE: bool = False
 
 # Forklift overload
 FORKLIFT_OVERLOAD_THRESHOLD: int = 3

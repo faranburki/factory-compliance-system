@@ -68,7 +68,7 @@ def _get_groq_client() -> "Groq":
 	return Groq(api_key=api_key)
 
 
-def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 512) -> str:
+def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 1024) -> str:
 	"""Resize and encode a frame as a base64 JPEG string for the Groq API."""
 	h, w = frame.shape[:2]
 	scale = min(max_side / max(h, w), 1.0)
@@ -81,7 +81,7 @@ def _encode_frame_base64(frame: np.ndarray, *, max_side: int = 512) -> str:
 def detect_vehicles(
 	frame: np.ndarray,
 	*,
-	model_name: str = "yolov8n.pt",
+	model_name: str = "yolov8m.pt",
 	confidence_threshold: float = 0.25,
 ) -> list[tuple[int, int, int, int]]:
 	"""Detect vehicles (potential forklifts) in a frame using YOLO."""
@@ -109,7 +109,7 @@ def count_blocks_with_groq(
 	frame: np.ndarray,
 	vehicle_box: tuple[int, int, int, int] | None = None,
 	*,
-	model: str = "llama-3.2-90b-vision-preview",
+	model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 ) -> tuple[int, float, str]:
 	"""Use Groq vision to count standardized blocks on a forklift.
 
@@ -184,71 +184,43 @@ def detect_forklift_violations_for_frame(
 	frame: np.ndarray,
 	*,
 	frame_index: int = 0,
-	model_name: str = "yolov8n.pt",
-	vision_model: str = "llama-3.2-90b-vision-preview",
+	model_name: str = "yolov8m.pt",
+	vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 	confidence_threshold: float = 0.25,
 	overload_threshold: int = OVERLOAD_THRESHOLD,
 	review_confidence_threshold: float = CONFIDENCE_THRESHOLD,
 ) -> list[ForkliftDetection]:
-	"""Detect forklift overload violations in a single frame."""
+	"""Detect forklift overload violations in a single frame using pure full-frame Groq Vision."""
 	detections: list[ForkliftDetection] = []
 
-	# First try to detect vehicles with YOLO
-	vehicle_boxes = detect_vehicles(frame, model_name=model_name, confidence_threshold=confidence_threshold)
-
-	if vehicle_boxes:
-		# Analyze each detected vehicle
-		for vehicle_box in vehicle_boxes:
-			try:
-				block_count, confidence, description = count_blocks_with_groq(
-					frame, vehicle_box, model=vision_model
+	try:
+		block_count, confidence, description = count_blocks_with_groq(frame, model=vision_model)
+		if block_count > 0:
+			is_violation = block_count >= overload_threshold
+			needs_review = confidence < review_confidence_threshold
+			detections.append(
+				ForkliftDetection(
+					frame_index=frame_index,
+					is_violation=is_violation,
+					block_count=block_count,
+					confidence=confidence,
+					needs_review=needs_review,
+					vehicle_box=None,
+					description=description,
 				)
-				is_violation = block_count >= overload_threshold
-				needs_review = confidence < review_confidence_threshold
-
-				detections.append(
-					ForkliftDetection(
-						frame_index=frame_index,
-						is_violation=is_violation,
-						block_count=block_count,
-						confidence=confidence,
-						needs_review=needs_review,
-						vehicle_box=vehicle_box,
-						description=description,
-					)
-				)
-			except Exception as exc:
-				detections.append(
-					ForkliftDetection(
-						frame_index=frame_index,
-						is_violation=False,
-						block_count=0,
-						confidence=0.0,
-						needs_review=True,
-						vehicle_box=vehicle_box,
-						description=f"Detection failed: {exc}",
-					)
-				)
-	else:
-		# No vehicles detected by YOLO — try full-frame analysis with Groq
-		try:
-			block_count, confidence, description = count_blocks_with_groq(frame, model=vision_model)
-			if block_count > 0:
-				is_violation = block_count >= overload_threshold
-				needs_review = confidence < review_confidence_threshold
-				detections.append(
-					ForkliftDetection(
-						frame_index=frame_index,
-						is_violation=is_violation,
-						block_count=block_count,
-						confidence=confidence,
-						needs_review=needs_review,
-						vehicle_box=None,
-						description=description,
-					)
-				)
-		except Exception:
-			pass  # No forklift detected at all — not an error
+			)
+	except Exception as exc:
+		detections.append(
+			ForkliftDetection(
+				frame_index=frame_index,
+				is_violation=False,
+				block_count=0,
+				confidence=0.0,
+				needs_review=True,
+				vehicle_box=None,
+				description=f"Detection failed: {exc}",
+			)
+		)
 
 	return detections
 
@@ -258,8 +230,8 @@ def detect_forklift_violations_in_video(
 	*,
 	stride: int = 60,
 	max_frames: int | None = 5,
-	model_name: str = "yolov8n.pt",
-	vision_model: str = "llama-3.2-90b-vision-preview",
+	model_name: str = "yolov8m.pt",
+	vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 	confidence_threshold: float = 0.25,
 ) -> list[ForkliftDetection]:
 	"""Run forklift overload detection over sampled frames from a video.

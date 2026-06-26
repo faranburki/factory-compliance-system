@@ -82,11 +82,12 @@ def run_all_detectors(
 	stride: int = 30,
 	max_frames: int | None = None,
 	vision_stride: int = 60,
-	vision_max_frames: int = 5,
+	vision_max_frames: int | None = 6,
 	model_name: str = "yolov8m.pt",
-	confidence_threshold: float = 0.40,
+	confidence_threshold: float = 0.25,
 	skip_vision: bool = False,
 	step_callback = None,
+	authorized_out: list[dict] | None = None,
 ) -> list[DetectionResult]:
 	"""Run all four detectors on a video clip and return unified results.
 
@@ -100,6 +101,11 @@ def run_all_detectors(
 		model_name: YOLO model name/path.
 		confidence_threshold: Minimum detection confidence.
 		skip_vision: If True, skip Groq vision-based detectors (panel, forklift).
+		authorized_out: Optional mutable list that will be filled with
+			dicts {"frame_index": int, "person_box": tuple} for each
+			green-vest authorized person detected.  Used by the annotator
+			to draw green boxes labeled "Authorized Intervention".
+			These are NOT violations and are never written to DB / alerts.
 
 	Returns:
 		List of DetectionResult objects, one per detected violation.
@@ -168,7 +174,32 @@ def run_all_detectors(
 				confidence_threshold=confidence_threshold,
 			)
 			violation_count = 0
+			authorized_count = 0
 			for det in vest_detections:
+				# ──────────────────────────────────────────────────
+				# AUTHORIZED INTERVENTION GUARD (Section 4.2 / 4.3)
+				#
+				# A person wearing a green vest is AUTHORIZED.
+				# This is a HARD STOP — the detection must NOT
+				# generate any DetectionResult, which means:
+				#   • No compliance report
+				#   • No database entry
+				#   • No alert queue entry
+				#   • No violation counter increment
+				#
+				# The detection exits the pipeline cleanly here.
+				# ──────────────────────────────────────────────────
+				if det.vest_color == "green":
+					authorized_count += 1
+					# Collect for annotator (green box + label) but
+					# do NOT create any DetectionResult / report / alert.
+					if authorized_out is not None:
+						authorized_out.append({
+							"frame_index": det.frame_index,
+							"person_box": det.person_box,
+						})
+					continue   # ← hard stop — nothing passes downstream
+
 				if det.is_violation:
 					violation_count += 1
 					results.append(
@@ -186,7 +217,7 @@ def run_all_detectors(
 							person_box=det.person_box,
 						)
 					)
-			print(f"        -> {violation_count} vest violation(s) found in {len(vest_detections)} detections")
+			print(f"        -> {violation_count} vest violation(s), {authorized_count} authorized person(s) found in {len(vest_detections)} detections")
 		except Exception as exc:
 			print(f"        -> Vest detector error: {exc}")
 
