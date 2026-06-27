@@ -30,7 +30,7 @@ Task:
 2. For each unsafe behavior, extract its rule reference, a plain-English rule text, and a source excerpt.
 3. Determine the Risk Severity Tier (LOW, MEDIUM, HIGH, CRITICAL) for each behavior. Base this strictly on the hazard context, warning callouts, frequency data, and alerting language described in the policy. IMPORTANT: "WARNING" callouts must map to MEDIUM severity. "CRITICAL SAFETY NOTICE" must map to CRITICAL severity.
 4. Extract the observable visual indicators needed to detect this behavior from a video feed (e.g., 'green vest', '3 or more blocks', 'green marked walkway').
-5. Extract any numeric thresholds mentioned in the observable indicators into a `detection_parameters` dictionary (e.g., {"overload_threshold": 3}).
+5. Extract any numeric thresholds mentioned in the observable indicators into a `detection_parameters` dictionary (e.g., {{"overload_threshold": 3}}).
 
 Return JSON that matches this structure:
 {{
