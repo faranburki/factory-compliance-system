@@ -38,6 +38,10 @@ class PolicyRule(BaseModel):
 		...,
 		description="List of observable visual indicators to detect this behavior (e.g., 'green vest', '3 or more blocks').",
 	)
+	detection_parameters: dict[str, int | float | str] | None = Field(
+		default=None,
+		description="Extracted numeric thresholds mentioned in the observable indicators (e.g., {'overload_threshold': 3}).",
+	)
 
 class PolicyRuleExtraction(BaseModel):
 	"""Structured Groq output for the policy-rule extraction step."""

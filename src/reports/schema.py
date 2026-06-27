@@ -27,5 +27,6 @@ class ReportEvent(BaseModel):
 	behavior_class: BehaviorClass = Field(..., description="Detected unsafe behavior class.")
 	policy_rule_ref: str = Field(..., description="Policy section reference for the rule.")
 	event_description: str = Field(..., description="Plain-English description of what was observed.")
+	observable_indicator_ref: str = Field(..., description="The observable indicator from the policy document.")
 	severity: SeverityTier = Field(..., description="Severity tier assigned to the event.")
 	escalation_action: str = Field(..., description="What the escalation pipeline did with the event.")

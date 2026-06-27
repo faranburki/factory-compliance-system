@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS events (
     behavior_class TEXT NOT NULL,
     policy_rule_ref TEXT NOT NULL,
     event_description TEXT NOT NULL,
+    observable_indicator_ref TEXT NOT NULL,
     severity TEXT NOT NULL,
     escalation_action TEXT NOT NULL
 )
@@ -49,9 +50,10 @@ def insert_event(db_path: str | Path, event: ReportEvent) -> None:
 			    behavior_class,
 			    policy_rule_ref,
 			    event_description,
+			    observable_indicator_ref,
 			    severity,
 			    escalation_action
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			""",
 			(
 				event.event_id,
@@ -61,6 +63,7 @@ def insert_event(db_path: str | Path, event: ReportEvent) -> None:
 				event.behavior_class,
 				event.policy_rule_ref,
 				event.event_description,
+				event.observable_indicator_ref,
 				event.severity,
 				event.escalation_action,
 			),
@@ -76,7 +79,7 @@ def fetch_events(
 ) -> list[ReportEvent]:
 	"""Fetch events from the database with optional filtering."""
 	initialize_database(db_path)
-	query = "SELECT event_id, timestamp, clip_id, zone, behavior_class, policy_rule_ref, event_description, severity, escalation_action FROM events"
+	query = "SELECT event_id, timestamp, clip_id, zone, behavior_class, policy_rule_ref, event_description, observable_indicator_ref, severity, escalation_action FROM events"
 	conditions: list[str] = []
 	params: list[str] = []
 
@@ -105,8 +108,9 @@ def fetch_events(
 				"behavior_class": row[4],
 				"policy_rule_ref": row[5],
 				"event_description": row[6],
-				"severity": row[7],
-				"escalation_action": row[8],
+				"observable_indicator_ref": row[7],
+				"severity": row[8],
+				"escalation_action": row[9],
 			}
 		)
 		for row in rows

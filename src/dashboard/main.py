@@ -494,6 +494,7 @@ def process_uploaded_video(video_path: Path):
 				behavior_class=det.behavior_class,
 				policy_rule_ref=det.policy_rule_ref,
 				event_description=det.event_description,
+				observable_indicator_ref=det.observable_indicator_ref,
 			)
 			route_event(DB_PATH, report_event, alert_q)
 		

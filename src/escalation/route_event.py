@@ -18,6 +18,7 @@ def build_report_event(
 	behavior_class: BehaviorClass,
 	policy_rule_ref: str,
 	event_description: str,
+	observable_indicator_ref: str,
 	*,
 	escalation_action: str | None = None,
 ) -> ReportEvent:
@@ -31,6 +32,7 @@ def build_report_event(
 		behavior_class=behavior_class,
 		policy_rule_ref=policy_rule_ref,
 		event_description=event_description,
+		observable_indicator_ref=observable_indicator_ref,
 		severity=severity,
 		escalation_action=escalation_action,
 	)

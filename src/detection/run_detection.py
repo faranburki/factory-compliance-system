@@ -39,14 +39,16 @@ def get_policy_rules() -> dict[str, dict]:
 		return {}
 
 
-def _match_policy_rule(keyword: str, rules: dict[str, dict]) -> tuple[str | None, str, list[str]]:
+def _match_policy_rule(keyword: str, rules: dict[str, dict]) -> tuple[str | None, str, str, dict]:
 	"""Match a detector keyword to the dynamically loaded policy rule."""
 	for bc, rule in rules.items():
 		if keyword.lower() in bc.lower() or keyword.lower() in rule.get("rule_text", "").lower():
 			pr = rule.get("policy_rule_ref", "Unknown Section")
 			indicators = rule.get("observable_indicators", [])
-			return bc, pr, indicators
-	return None, "Unknown Section", []
+			indicators_str = ", ".join(indicators) if isinstance(indicators, list) else str(indicators)
+			detection_parameters = rule.get("detection_parameters", {})
+			return bc, pr, indicators_str, detection_parameters
+	return None, "Unknown Section", "No indicators", {}
 
 
 @dataclass
@@ -59,6 +61,7 @@ class DetectionResult:
 	confidence: float
 	frame_index: int
 	clip_id: str
+	observable_indicator_ref: str
 	needs_review: bool = False
 	person_box: tuple[int, int, int, int] | None = None
 
@@ -71,6 +74,7 @@ class DetectionResult:
 			"confidence": self.confidence,
 			"frame_index": self.frame_index,
 			"clip_id": self.clip_id,
+			"observable_indicator_ref": self.observable_indicator_ref,
 			"needs_review": self.needs_review,
 		}
 
@@ -116,12 +120,14 @@ def run_all_detectors(
 	policy_rules = get_policy_rules()
 
 	# ── 1. Walkway Detector (Class 0) ──────────────────────────────────
-	bc_walkway, pr_walkway, ind_walkway = _match_policy_rule("walkway", policy_rules)
+	bc_walkway, pr_walkway, ind_walkway, param_walkway = _match_policy_rule("walkway", policy_rules)
 	if not bc_walkway:
 		print(f"  [1/4] Skipping walkway detector (no matching policy rule)")
 		if step_callback: step_callback("[1/4] Skipping walkway detector")
 	else:
 		print(f"  [1/4] Running walkway detector on {clip_id}...")
+		print(f"        [WalkwayDetector] Observable indicator from policy: \"{ind_walkway}\"")
+		print(f"        [WalkwayDetector] Checking foot position against camera-calibrated polygon")
 		if step_callback: step_callback("[1/4] Running walkway detector...")
 		try:
 			metadata = load_video_metadata(video_path)
@@ -150,6 +156,7 @@ def run_all_detectors(
 							confidence=det.confidence,
 							frame_index=det.frame_index,
 							clip_id=clip_id,
+							observable_indicator_ref=ind_walkway,
 							person_box=det.person_box,
 						)
 					)
@@ -158,12 +165,14 @@ def run_all_detectors(
 			print(f"        -> Walkway detector error: {exc}")
 
 	# ── 2. Vest Detector (Class 1) ─────────────────────────────────────
-	bc_vest, pr_vest, ind_vest = _match_policy_rule("intervention", policy_rules)
+	bc_vest, pr_vest, ind_vest, param_vest = _match_policy_rule("intervention", policy_rules)
 	if not bc_vest:
 		print(f"  [2/4] Skipping vest detector (no matching policy rule)")
 		if step_callback: step_callback("[2/4] Skipping vest detector")
 	else:
 		print(f"  [2/4] Running vest detector on {clip_id}...")
+		print(f"        [VestDetector] Observable indicator from policy: \"{ind_vest}\"")
+		print(f"        [VestDetector] Applying HSV green range detection")
 		if step_callback: step_callback("[2/4] Running vest detector...")
 		try:
 			vest_detections = detect_vest_violations_in_video(
@@ -214,6 +223,7 @@ def run_all_detectors(
 							confidence=det.confidence,
 							frame_index=det.frame_index,
 							clip_id=clip_id,
+							observable_indicator_ref=ind_vest,
 							person_box=det.person_box,
 						)
 					)
@@ -222,7 +232,7 @@ def run_all_detectors(
 			print(f"        -> Vest detector error: {exc}")
 
 	# ── 3. Panel Detector (Class 2) — Groq vision ─────────────────────
-	bc_panel, pr_panel, ind_panel = _match_policy_rule("panel", policy_rules)
+	bc_panel, pr_panel, ind_panel, param_panel = _match_policy_rule("panel", policy_rules)
 	if not bc_panel:
 		print(f"  [3/4] Skipping panel detector (no matching policy rule)")
 		if step_callback: step_callback("[3/4] Skipping panel detector")
@@ -231,6 +241,7 @@ def run_all_detectors(
 		if step_callback: step_callback("[3/4] Skipping panel detector (vision disabled)")
 	else:
 		print(f"  [3/4] Running panel detector on {clip_id}...")
+		print(f"        [PanelDetector] Observable indicator from policy: \"{ind_panel}\"")
 		if step_callback: step_callback("[3/4] Running panel detector...")
 		try:
 			panel_detections = detect_panel_violations_in_video(
@@ -254,6 +265,7 @@ def run_all_detectors(
 							confidence=det.confidence,
 							frame_index=det.frame_index,
 							clip_id=clip_id,
+							observable_indicator_ref=ind_panel,
 						)
 					)
 			print(f"        -> {violation_count} panel violation(s) found in {len(panel_detections)} detections")
@@ -261,7 +273,7 @@ def run_all_detectors(
 			print(f"        -> Panel detector error: {exc}")
 
 	# ── 4. Forklift Detector (Class 3) — YOLO + Groq vision ───────────
-	bc_forklift, pr_forklift, ind_forklift = _match_policy_rule("forklift", policy_rules)
+	bc_forklift, pr_forklift, ind_forklift, param_forklift = _match_policy_rule("forklift", policy_rules)
 	if not bc_forklift:
 		print(f"  [4/4] Skipping forklift detector (no matching policy rule)")
 		if step_callback: step_callback("[4/4] Skipping forklift detector")
@@ -270,6 +282,13 @@ def run_all_detectors(
 		if step_callback: step_callback("[4/4] Skipping forklift detector (vision disabled)")
 	else:
 		print(f"  [4/4] Running forklift detector on {clip_id}...")
+		print(f"        [ForkliftDetector] Observable indicator from policy: \"{ind_forklift}\"")
+		
+		overload_threshold = param_forklift.get("overload_threshold")
+		if overload_threshold is None:
+			print("        [ForkliftDetector] Warning: overload_threshold not found in policy JSON, falling back to 3")
+			overload_threshold = 3
+			
 		if step_callback: step_callback("[4/4] Running forklift detector...")
 		try:
 			forklift_detections = detect_forklift_violations_in_video(
@@ -278,6 +297,7 @@ def run_all_detectors(
 				max_frames=vision_max_frames,
 				model_name=model_name,
 				confidence_threshold=confidence_threshold,
+				overload_threshold=overload_threshold,
 			)
 			violation_count = 0
 			for det in forklift_detections:
@@ -297,6 +317,7 @@ def run_all_detectors(
 							confidence=det.confidence,
 							frame_index=det.frame_index,
 							clip_id=clip_id,
+							observable_indicator_ref=ind_forklift,
 							needs_review=det.needs_review,
 						)
 					)

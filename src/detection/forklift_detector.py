@@ -233,6 +233,7 @@ def detect_forklift_violations_in_video(
 	model_name: str = "yolov8m.pt",
 	vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 	confidence_threshold: float = 0.25,
+	overload_threshold: int = OVERLOAD_THRESHOLD,
 ) -> list[ForkliftDetection]:
 	"""Run forklift overload detection over sampled frames from a video.
 
@@ -247,6 +248,7 @@ def detect_forklift_violations_in_video(
 			model_name=model_name,
 			vision_model=vision_model,
 			confidence_threshold=confidence_threshold,
+			overload_threshold=overload_threshold,
 		)
 		all_detections.extend(frame_detections)
 	return all_detections

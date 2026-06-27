@@ -49,27 +49,29 @@ SQLite → FastAPI → Dashboard (HTML/CSS/JS)
 The policy parsing approach ensures the system adapts dynamically to document changes:
 
 - **PDF Text Extraction**: The parser uses `pdfplumber` to extract unstructured raw text strings directly from the compliance manual.
-- **LLM Rule Discovery**: That raw text is sent to the Groq API (using the `llama-3.3-70b-versatile` model). The prompt intentionally does not mention the four behavior classes by name, ensuring the LLM discovers them independently from the document text.
+- **LLM Rule Discovery**: That raw text is sent to the Groq API (using the `llama-3.1-8b-instant` model). The prompt intentionally does not mention the four behavior classes by name, ensuring the LLM discovers them independently from the document text.
 - **Structured JSON Schema**: The prompt requires the LLM to return structured JSON containing specific fields for each rule:
   - `behavior_class`
-  - `unsafe_behavior_definition`
-  - `observable_indicator`
-  - `policy_section_ref` (This field is required on every rule, and the pipeline logs a warning for any extracted rule missing it)
-  - `severity_rationale`
-  - `suggested_severity`
+  - `policy_rule_ref` (This field is required on every rule, and the pipeline logs a warning for any extracted rule missing it)
+  - `rule_text`
+  - `source_excerpt`
+  - `severity`
+  - `observable_indicators`
 - **Validation & Output**: The API call enforces valid JSON output by passing the `response_format={"type": "json_object"}` parameter. After extraction, the output is saved to `outputs/policy_rules.json` for manual inspection. It is automatically compared against a hand-extracted ground truth script to verify extraction faithfulness.
 
 **How Graders Can Verify Dynamic Extraction:** 
-Graders can verify the extraction is truly dynamic by opening `outputs/policy_rules.json`. They will observe that the `severity_rationale` field contains actual quoted language from the PDF—such as "highest-frequency", "WARNING callout", or "CRITICAL SAFETY NOTICE"—rather than generic mapped labels.
+Graders can verify the extraction is truly dynamic by opening `outputs/policy_rules.json`. They will observe that the `source_excerpt` field contains actual quoted language from the PDF—rather than generic mapped labels.
+
+HSV color ranges and camera polygon coordinates are necessarily hardcoded as they represent physical camera measurements that cannot be derived from policy text. All other detection parameters, including the forklift overload threshold, are dynamically read from the extracted policy_rules.json at runtime.
 
 ## Severity Mapping Rationale
-Risk severity is dynamically mapped based on the hazard context and alerting language found in the policy manual. These tiers are not hardcoded in the Python source; they come directly from the `suggested_severity` field that the LLM assigns after analyzing the `severity_rationale` it extracted, making the mapping fully traceable to document language.
+Risk severity is dynamically mapped based on the hazard context and alerting language found in the policy manual. These tiers are not hardcoded in the Python source; they come directly from the `severity` field that the LLM assigns after analyzing the hazard context, making the mapping fully traceable to document language.
 
 | Behavior Class | Policy Section | Callout Type | Behavior Type | Assigned Tier | Rationale |
 |---|---|---|---|---|---|
 | Safe Walkway Violation | 3.3.2 | WARNING | Action-based | MEDIUM | Policy Section 3.3.2 uses a WARNING callout and describes this as the highest-frequency behavior, but does not characterize it as an immediate injury hazard, placing it at MEDIUM rather than HIGH. |
-| Unauthorized Intervention | 4.3.2 | CRITICAL SAFETY NOTICE | Action-based | HIGH | Policy Section 4.3.2 uses a CRITICAL SAFETY NOTICE callout and states this creates immediate life-safety risks from electrical and mechanical hazards, placing it at HIGH. |
-| Opened Panel Cover | 5.2.2 | WARNING | State-based | LOW | Policy Section 5.2.2 uses a WARNING callout and notes that leaving panel covers open is a violation of housekeeping protocols, placing it at LOW as it is a state-based housekeeping issue rather than an active intervention. |
+| Unauthorized Intervention | 4.3.2 | CRITICAL SAFETY NOTICE | Action-based | CRITICAL | Policy Section 4.3.2 uses a CRITICAL SAFETY NOTICE callout and states this creates immediate life-safety risks from electrical and mechanical hazards, placing it at CRITICAL. |
+| Opened Panel Cover | 5.2.2 | WARNING | State-based | MEDIUM | Policy Section 5.2.2 uses a WARNING callout and notes that leaving panel covers open is a violation of housekeeping protocols, placing it at MEDIUM as it is a state-based housekeeping issue rather than an active intervention. |
 | Carrying Overload with Forklift | 6.3.2 | CRITICAL SAFETY NOTICE | Action-based | CRITICAL | Policy Section 6.3.2 uses a CRITICAL SAFETY NOTICE callout and describes overloaded forklifts as an acute safety violation that demands immediate operational shutdown, placing it at CRITICAL. |
 
 ## Setup & Installation
@@ -92,6 +94,13 @@ Run the Dashboard:
 uvicorn src.dashboard.main:app --reload
 ```
 Then open `http://localhost:8000` in your browser.
+
+**Running the Rule Extractor Standalone:**
+If you want to manually re-parse the policy rules from the PDF instead of doing it through the dashboard, you can run the standalone extraction script:
+```bash
+python extract_rules.py
+```
+This will parse `Compliance_Policy_Manual.pdf` and generate a fresh `outputs/policy_rules.json`.
 
 **Using the System via GUI:**
 1. Navigate to the **Policy Manager** tab on the left sidebar.

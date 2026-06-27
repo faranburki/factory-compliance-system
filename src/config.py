@@ -28,6 +28,15 @@ YOLO_MODEL: str = "yolov8m.pt"
 FRAME_STRIDE: int = 30
 MAX_FRAMES: int | None = None
 
+# Camera-specific calibration values — these cannot be derived from
+# policy text as they represent physical measurements of this facility's
+# camera angles and lighting conditions. The policy defines WHAT to
+# detect (vest color, walkway boundary) but not the pixel-level
+# parameters required to detect it in this specific camera feed.
+# All behavior classes, severity tiers, and numeric thresholds that
+# ARE stated in policy text are loaded dynamically from
+# outputs/policy_rules.json at runtime.
+
 # Walkway polygon ratios (fraction of frame dimensions)
 WALKWAY_TOP_Y_RATIO: float = 0.55
 WALKWAY_LEFT_X_RATIO: float = 0.12
@@ -58,7 +67,7 @@ FORKLIFT_OVERLOAD_THRESHOLD: int = 3
 FORKLIFT_CONFIDENCE_THRESHOLD: float = 0.5
 
 # Groq vision model for panel/forklift detection
-GROQ_VISION_MODEL: str = "llama-3.2-90b-vision-preview"
+GROQ_VISION_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
 GROQ_TEXT_MODEL: str = "llama-3.1-8b-instant"
 
 # ── Facility zone label (default for single-camera setup) ───────────────

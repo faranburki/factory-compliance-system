@@ -515,9 +515,7 @@ input[type="file"]::file-selector-button:hover {
       <select id="stream-severity-filter">
         <option value="">All</option>
         <option value="CRITICAL">Critical</option>
-        <option value="HIGH">High</option>
         <option value="MEDIUM">Medium</option>
-        <option value="LOW">Low</option>
       </select>
       <label>Class</label>
       <select id="stream-class-filter">
@@ -531,6 +529,7 @@ input[type="file"]::file-selector-button:hover {
             <th>Timestamp</th>
             <th>Severity</th>
             <th>Behavior Class</th>
+            <th>Observable Indicator</th>
             <th>Clip</th>
             <th>Zone</th>
           </tr>
@@ -551,9 +550,7 @@ input[type="file"]::file-selector-button:hover {
       <select id="log-severity-filter">
         <option value="">All</option>
         <option value="CRITICAL">Critical</option>
-        <option value="HIGH">High</option>
         <option value="MEDIUM">Medium</option>
-        <option value="LOW">Low</option>
       </select>
       <label>Class</label>
       <select id="log-class-filter">
@@ -574,6 +571,7 @@ input[type="file"]::file-selector-button:hover {
             <th>Zone</th>
             <th>Behavior Class</th>
             <th>Policy Ref</th>
+            <th>Observable Indicator</th>
             <th>Severity</th>
             <th>Escalation</th>
           </tr>
@@ -819,6 +817,7 @@ function renderStream() {
       '<td class="mono">' + formatTimestamp(ev.timestamp) + '</td>' +
       '<td><span class="' + badgeClass(sev) + '">' + sev + '</span></td>' +
       '<td>' + ev.behavior_class + '</td>' +
+      '<td>' + (ev.observable_indicator_ref || '—') + '</td>' +
       '<td class="mono">' + ev.clip_id + '</td>' +
       '<td>' + ev.zone + '</td>';
     tbody.appendChild(tr);
@@ -855,6 +854,7 @@ async function fetchLog() {
       '<td>' + ev.zone + '</td>' +
       '<td>' + ev.behavior_class + '</td>' +
       '<td class="mono">' + ev.policy_rule_ref + '</td>' +
+      '<td>' + (ev.observable_indicator_ref || '—') + '</td>' +
       '<td><span class="' + badgeClass(ev.severity) + '">' + ev.severity + '</span></td>' +
       '<td>' + ev.escalation_action + '</td>';
     tbody.appendChild(tr);

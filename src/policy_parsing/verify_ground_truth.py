@@ -20,7 +20,7 @@ GROUND_TRUTH = PolicyRuleExtraction(
 			policy_rule_ref="Section 4.3.2",
 			rule_text="Personnel may only interact with equipment while wearing the green authorization vest and required safety equipment.",
 			source_excerpt="interacting with or adjusting production equipment while wearing a red-black vest or any vest other than the designated green authorization vest",
-			severity="HIGH",
+			severity="CRITICAL",
 			observable_indicators=["green vest", "red-black vest"],
 		),
 		PolicyRule(
@@ -28,7 +28,7 @@ GROUND_TRUTH = PolicyRuleExtraction(
 			policy_rule_ref="Section 5.2.2",
 			rule_text="An electrical panel cover must not be left open during production operations.",
 			source_excerpt="the cover of an electrical panel connected to a production machine has been left in the open position",
-			severity="LOW",
+			severity="MEDIUM",
 			observable_indicators=["electrical panel cover", "open position"],
 		),
 		PolicyRule(
@@ -38,6 +38,7 @@ GROUND_TRUTH = PolicyRuleExtraction(
 			source_excerpt="operating a forklift while carrying three (3) or more standardized blocks in a single load",
 			severity="CRITICAL",
 			observable_indicators=["forklift", "3 or more blocks"],
+			detection_parameters={"overload_threshold": 3},
 		),
 	]
 )

@@ -118,6 +118,7 @@ def run_pipeline(
 				behavior_class=det.behavior_class,
 				policy_rule_ref=det.policy_rule_ref,
 				event_description=det.event_description,
+				observable_indicator_ref=det.observable_indicator_ref,
 			)
 
 			# Route to DB (and alert queue if HIGH/CRITICAL)
