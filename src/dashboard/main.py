@@ -398,6 +398,9 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
 	filename = file.filename
 	target_path = DATA_DIR / filename
 	
+	# Ensure the data directory exists in case it was deleted
+	target_path.parent.mkdir(parents=True, exist_ok=True)
+	
 	# Save the file
 	with target_path.open("wb") as buffer:
 		shutil.copyfileobj(file.file, buffer)
@@ -538,8 +541,8 @@ def process_uploaded_video(video_path: Path):
 		processing_status["is_processing"] = False
 
 # ── Mount static files AFTER all routes ─────────────────────────────────
-if STATIC_DIR.exists():
-	app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-if DATA_DIR.exists():
-	app.mount("/data", StaticFiles(directory=str(DATA_DIR)), name="data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/data", StaticFiles(directory=str(DATA_DIR)), name="data")
