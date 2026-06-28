@@ -2,8 +2,8 @@
 
 Class 3 — Carrying Overload with Forklift: Uses YOLO to detect vehicles
 and the Groq vision API to count standardized blocks on the forks.
-A count of 3 or more is a violation. Below the confidence threshold,
-the event is flagged for human review.
+A count at or above the configured threshold is a violation. Below the
+confidence threshold, the event is flagged for human review.
 """
 
 from __future__ import annotations
@@ -29,10 +29,6 @@ except ImportError:  # pragma: no cover
 	Groq = None
 
 from .video_utils import iter_video_frames
-
-
-OVERLOAD_THRESHOLD = 3
-CONFIDENCE_THRESHOLD = 0.5
 
 # YOLO COCO class IDs for vehicles that could be forklifts
 VEHICLE_CLASS_IDS = {2, 5, 7}  # car, bus, truck — forklift often detected as truck
@@ -187,8 +183,8 @@ def detect_forklift_violations_for_frame(
 	model_name: str = "yolov8m.pt",
 	vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 	confidence_threshold: float = 0.25,
-	overload_threshold: int = OVERLOAD_THRESHOLD,
-	review_confidence_threshold: float = CONFIDENCE_THRESHOLD,
+	overload_threshold: int,
+	review_confidence_threshold: float = 0.5,
 ) -> list[ForkliftDetection]:
 	"""Detect forklift overload violations in a single frame using pure full-frame Groq Vision."""
 	detections: list[ForkliftDetection] = []
@@ -233,7 +229,7 @@ def detect_forklift_violations_in_video(
 	model_name: str = "yolov8m.pt",
 	vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct",
 	confidence_threshold: float = 0.25,
-	overload_threshold: int = OVERLOAD_THRESHOLD,
+	overload_threshold: int,
 ) -> list[ForkliftDetection]:
 	"""Run forklift overload detection over sampled frames from a video.
 

@@ -286,44 +286,46 @@ def run_all_detectors(
 		
 		overload_threshold = param_forklift.get("overload_threshold")
 		if overload_threshold is None:
-			print("        [ForkliftDetector] Warning: overload_threshold not found in policy JSON, falling back to 3")
-			overload_threshold = 3
-			
-		if step_callback: step_callback("[4/4] Running forklift detector...")
-		try:
-			forklift_detections = detect_forklift_violations_in_video(
-				video_path,
-				stride=vision_stride,
-				max_frames=vision_max_frames,
-				model_name=model_name,
-				confidence_threshold=confidence_threshold,
-				overload_threshold=overload_threshold,
-			)
-			violation_count = 0
-			for det in forklift_detections:
-				if det.is_violation:
-					violation_count += 1
-					review_note = " [FLAGGED FOR HUMAN REVIEW]" if det.needs_review else ""
-					results.append(
-						DetectionResult(
-							behavior_class=bc_forklift,
-							policy_rule_ref=pr_forklift,
-							event_description=(
-								f"Forklift detected carrying {det.block_count} blocks at frame {det.frame_index}. "
-								f"Threshold is 3 or more blocks.{review_note} "
-								f"Groq analysis: {det.description}"
-							),
-							zone=zone,
-							confidence=det.confidence,
-							frame_index=det.frame_index,
-							clip_id=clip_id,
-							observable_indicator_ref=ind_forklift,
-							needs_review=det.needs_review,
+			print("        [ForkliftDetector] ERROR: overload_threshold not found in policy JSON — skipping forklift detector.")
+			print("        [ForkliftDetector] Please ensure the parsed policy defines detection_parameters.overload_threshold.")
+			if step_callback: step_callback("[4/4] Skipped forklift detector (no threshold in policy)")
+		else:
+			print(f"        [ForkliftDetector] Using overload_threshold={overload_threshold} from policy")
+			if step_callback: step_callback("[4/4] Running forklift detector...")
+			try:
+				forklift_detections = detect_forklift_violations_in_video(
+					video_path,
+					stride=vision_stride,
+					max_frames=vision_max_frames,
+					model_name=model_name,
+					confidence_threshold=confidence_threshold,
+					overload_threshold=overload_threshold,
+				)
+				violation_count = 0
+				for det in forklift_detections:
+					if det.is_violation:
+						violation_count += 1
+						review_note = " [FLAGGED FOR HUMAN REVIEW]" if det.needs_review else ""
+						results.append(
+							DetectionResult(
+								behavior_class=bc_forklift,
+								policy_rule_ref=pr_forklift,
+								event_description=(
+									f"Forklift detected carrying {det.block_count} blocks at frame {det.frame_index}. "
+									f"Threshold is {overload_threshold} or more blocks.{review_note} "
+									f"Groq analysis: {det.description}"
+								),
+								zone=zone,
+								confidence=det.confidence,
+								frame_index=det.frame_index,
+								clip_id=clip_id,
+								observable_indicator_ref=ind_forklift,
+								needs_review=det.needs_review,
+							)
 						)
-					)
-			print(f"        -> {violation_count} forklift violation(s) found in {len(forklift_detections)} detections")
-		except Exception as exc:
-			print(f"        -> Forklift detector error: {exc}")
+				print(f"        -> {violation_count} forklift violation(s) found in {len(forklift_detections)} detections")
+			except Exception as exc:
+				print(f"        -> Forklift detector error: {exc}")
 
 	print(f"  Total: {len(results)} violation(s) detected in {clip_id}")
 	if step_callback: step_callback(f"Detection complete — {len(results)} violation(s) found")

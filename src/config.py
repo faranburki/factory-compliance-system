@@ -62,9 +62,10 @@ GREEN_VEST_RATIO_THRESHOLD: float = 0.06
 # Debug mode: saves torso crops and green masks to outputs/vest_debug/
 VEST_DEBUG_MODE: bool = False
 
-# Forklift overload
-FORKLIFT_OVERLOAD_THRESHOLD: int = 3
-FORKLIFT_CONFIDENCE_THRESHOLD: float = 0.5
+# Forklift overload — threshold is loaded dynamically from
+# outputs/policy_rules.json (parsed from the Compliance Policy Manual).
+# No hardcoded default; if the policy JSON is missing the value the
+# detector is skipped with a clear warning.
 
 # Groq vision model for panel/forklift detection
 GROQ_VISION_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
